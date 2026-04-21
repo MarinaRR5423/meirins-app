@@ -15,44 +15,104 @@
   <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png"/>
   <!-- iOS splash screens -->
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
+    /* ── M3 Expressive Design Tokens ── */
+    :root{
+      --md-pri:#1A56DB; --md-pri-c:#D6E3FF; --md-on-pri-c:#001A41;
+      --md-sec:#059669; --md-sec-c:#BCEFDA; --md-on-sec-c:#002117;
+      --md-surf:#F3F6FF; --md-surf-c:#E8ECFA; --md-surf-ch:#DDE2F4;
+      --md-on-surf:#1A1C2A; --md-on-surf-v:#43474F;
+      --md-outline:#72767F; --md-outline-v:#C2C6D0;
+      --md-r-xs:8px; --md-r-s:12px; --md-r-m:16px;
+      --md-r-l:20px; --md-r-xl:28px; --md-r-full:100px;
+      --md-elev1:0 1px 3px rgba(26,86,219,.08),0 4px 16px rgba(26,86,219,.06);
+      --md-elev2:0 2px 8px rgba(26,86,219,.10),0 8px 28px rgba(26,86,219,.09);
+      --md-elev3:0 4px 16px rgba(26,86,219,.12),0 16px 48px rgba(26,86,219,.12);
+    }
     *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-    body{background:#EEF4FF;font-family:'DM Sans',sans-serif;overscroll-behavior:none;}
+    body{background:var(--md-surf);font-family:'Plus Jakarta Sans',sans-serif;overscroll-behavior:none;-webkit-font-smoothing:antialiased;}
+    input,textarea,button,select{font-family:'Plus Jakarta Sans',sans-serif;}
     input[type=date]{color-scheme:light;}
     ::-webkit-scrollbar{display:none;}
-    #splash{position:fixed;inset:0;background:linear-gradient(145deg,#0F1E4A,#1A56DB 55%,#059669);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity .6s;}
+
+    /* ── Splash ── */
+    #splash{position:fixed;inset:0;background:linear-gradient(145deg,#0A1628 0%,#1A3A8F 45%,#1A56DB 70%,#059669 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity .7s cubic-bezier(.4,0,.2,1);}
     #splash.hide{opacity:0;pointer-events:none;}
-    @keyframes pu{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
-    @keyframes su{from{transform:translateY(100%)}to{transform:translateY(0)}}
-    @keyframes bk{0%,100%{opacity:1}50%{opacity:.3}}
-    .dot{width:7px;height:7px;border-radius:50%;background:#1A56DB;display:inline-block;animation:bk 1.2s ease-in-out infinite;}
+    .splash-ring{position:absolute;border-radius:50%;border:1px solid rgba(255,255,255,.06);}
+
+    /* ── Animations ── */
+    @keyframes pu{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+    @keyframes su{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+    @keyframes fd{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes bk{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.7)}}
+    @keyframes spin-slow{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    @keyframes bounce-in{0%{transform:scale(.85);opacity:0}60%{transform:scale(1.05)}80%{transform:scale(.97)}100%{transform:scale(1);opacity:1}}
+
+    /* ── Typing dots ── */
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--md-pri);display:inline-block;animation:bk 1.2s ease-in-out infinite;}
     .dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
+
+    /* ── M3 Card ── */
+    .m3-card{background:#fff;border-radius:var(--md-r-xl);padding:18px;margin-bottom:10px;box-shadow:var(--md-elev1);border:1px solid rgba(194,198,208,.3);transition:box-shadow .2s,transform .15s;}
+    .m3-card:active{transform:scale(.985);}
+    .m3-card-tonal{border-radius:var(--md-r-xl);padding:18px;margin-bottom:10px;}
+
+    /* ── M3 Chip ── */
+    .m3-chip{display:inline-flex;align-items:center;padding:6px 14px;border-radius:var(--md-r-full);font-size:12px;font-weight:600;border:none;cursor:pointer;transition:all .2s;}
+
+    /* ── M3 Nav bar ── */
+    .m3-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(430px,100%);background:rgba(243,246,255,.92);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border-top:1px solid var(--md-outline-v);display:flex;align-items:center;padding:8px 4px 22px;box-shadow:0 -2px 20px rgba(26,86,219,.06);z-index:100;}
+    .m3-nav-btn{flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0;position:relative;}
+    .m3-nav-pill{width:64px;height:32px;border-radius:var(--md-r-full);display:flex;align-items:center;justify-content:center;transition:all .25s cubic-bezier(.34,1.56,.64,1);}
+    .m3-nav-pill.active{background:var(--md-pri-c);}
+    .m3-nav-label{font-size:11px;font-weight:600;transition:color .2s;letter-spacing:.2px;}
+
+    /* ── M3 Segmented control ── */
+    .m3-seg{display:flex;background:var(--md-surf-c);border-radius:var(--md-r-full);padding:3px;margin-bottom:14px;}
+    .m3-seg-btn{flex:1;padding:9px 4px;border-radius:var(--md-r-full);border:none;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s cubic-bezier(.4,0,.2,1);}
+
+    /* ── Fab-style button ── */
+    .m3-fab{border-radius:var(--md-r-l);padding:14px 24px;border:none;font-weight:700;font-size:15px;cursor:pointer;transition:all .2s cubic-bezier(.4,0,.2,1);letter-spacing:.3px;}
+    .m3-fab:active{transform:scale(.96);}
+
+    /* ── Range inputs ── */
+    input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:2px;outline:none;}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2);}
   </style>
 </head>
 <body>
 <div id="splash">
-  <div style="font-size:72px;animation:pu 2s infinite">⚡</div>
-  <div style="font-family:'Syne',sans-serif;font-size:44px;color:white;font-weight:800;letter-spacing:-1px;margin-top:10px">Meirins</div>
-  <div style="color:rgba(255,255,255,.5);font-size:10px;letter-spacing:4px;text-transform:uppercase;margin-top:8px">CICLO · ENERGÍA · FUERZA</div>
+  <div class="splash-ring" style="width:320px;height:320px;opacity:.04;animation:spin-slow 20s linear infinite;top:50%;left:50%;margin:-160px 0 0 -160px;border-width:1px;border-color:rgba(255,255,255,.15)"></div>
+  <div class="splash-ring" style="width:220px;height:220px;opacity:.06;animation:spin-slow 14s linear infinite reverse;top:50%;left:50%;margin:-110px 0 0 -110px;"></div>
+  <div class="splash-ring" style="width:140px;height:140px;opacity:.08;top:50%;left:50%;margin:-70px 0 0 -70px;"></div>
+  <div style="position:relative;z-index:1;text-align:center">
+    <div style="width:88px;height:88px;border-radius:28px;background:rgba(255,255,255,.15);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:44px;box-shadow:0 8px 32px rgba(0,0,0,.2);animation:bounce-in .8s cubic-bezier(.34,1.56,.64,1)">⚡</div>
+    <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:46px;color:white;font-weight:800;letter-spacing:-2px;line-height:1">Meirins</div>
+    <div style="color:rgba(255,255,255,.45);font-size:10px;letter-spacing:5px;text-transform:uppercase;margin-top:10px;font-weight:500">CICLO · ENERGÍA · FUERZA</div>
+  </div>
 </div>
 <div id="root"></div>
 
 <!-- ══ DATA (no Babel needed) ══════════════════════════════════════════════ -->
 <script>
 const C={
-  blue:"#1A56DB",blueD:"#0F1E4A",blueL:"#EEF4FF",blueM:"rgba(26,86,219,.1)",
-  green:"#059669",greenL:"#ECFDF5",greenM:"rgba(5,150,105,.1)",
-  cyan:"#0891B2",cyanL:"#ECFEFF",cyanM:"rgba(8,145,178,.1)",
-  indigo:"#4F46E5",indigoL:"#EEF2FF",indigoM:"rgba(79,70,229,.1)",
-  teal:"#0D9488",tealL:"#F0FDFA",tealM:"rgba(13,148,136,.1)",
-  bg:"#EEF4FF",card:"#FFFFFF",
-  text:"#0F172A",text2:"#475569",text3:"#94A3B8",
-  border:"#BFDBFE",borderL:"#E0EAFF"
+  blue:"#1A56DB",blueD:"#0A1628",blueL:"#D6E3FF",blueM:"rgba(26,86,219,.10)",blueMid:"#4476E8",
+  green:"#059669",greenD:"#003720",greenL:"#BCEFDA",greenM:"rgba(5,150,105,.10)",
+  cyan:"#0284C7",cyanL:"#BAE6FD",cyanM:"rgba(2,132,199,.10)",
+  indigo:"#4338CA",indigoL:"#C7D2FE",indigoM:"rgba(67,56,202,.10)",
+  teal:"#0D9488",tealL:"#99F6E4",tealM:"rgba(13,148,136,.10)",
+  bg:"#F3F6FF",card:"#FFFFFF",
+  surf:"#E8ECFA",surfH:"#DDE2F4",
+  text:"#1A1C2A",text2:"#43474F",text3:"#72767F",
+  border:"#C2C6D0",borderL:"#E2E6F0",
+  // M3 tonal helpers
+  pri:"#1A56DB",priC:"#D6E3FF",onPriC:"#001A41",
+  sec:"#059669",secC:"#BCEFDA",onSecC:"#002117",
 };
 
 const PH_DATA={
@@ -321,17 +381,62 @@ async function loadFromSupabase(){
 <script type="text/babel">
 const {useState,useEffect,useRef,useMemo}=React;
 
-// ── Shared styles ──────────────────────────────────────────────────────────
-const card={background:"#fff",borderRadius:20,padding:16,marginBottom:12,boxShadow:"0 2px 16px rgba(26,86,219,.07)"};
+// ── Shared components (M3 Expressive) ──────────────────────────────────────
 const Row=({children,style={}})=><div style={{display:"flex",alignItems:"center",...style}}>{children}</div>;
-const Card=({children,style={},onClick})=><div onClick={onClick} style={{...card,...style,cursor:onClick?"pointer":"default"}}>{children}</div>;
-const SubTabs=({tabs,active,set,color=C.blue})=>(
-  <div style={{display:"flex",background:"#fff",borderRadius:50,padding:4,marginBottom:14,boxShadow:"0 2px 10px rgba(26,86,219,.08)"}}>
-    {tabs.map(t=><button key={t.id} onClick={()=>set(t.id)} style={{flex:1,padding:"9px 4px",borderRadius:46,border:"none",fontSize:11,fontWeight:active===t.id?800:500,background:active===t.id?color:"transparent",color:active===t.id?"#fff":C.text3,cursor:"pointer"}}>{t.l}</button>)}
+
+const Card=({children,style={},onClick,tonal=false,color="transparent"})=>{
+  const base={background:tonal?color:"#fff",borderRadius:28,padding:18,marginBottom:10,
+    boxShadow:tonal?"none":"0 1px 3px rgba(26,86,219,.07),0 4px 16px rgba(26,86,219,.05)",
+    border:tonal?"none":"1px solid rgba(194,198,208,.25)",
+    cursor:onClick?"pointer":"default",transition:"transform .15s,box-shadow .15s",
+    WebkitTapHighlightColor:"transparent"};
+  return <div onClick={onClick} style={{...base,...style}}
+    onMouseDown={e=>{if(onClick)e.currentTarget.style.transform="scale(.985)"}}
+    onMouseUp={e=>{if(onClick)e.currentTarget.style.transform="scale(1)"}}
+    onMouseLeave={e=>{if(onClick)e.currentTarget.style.transform="scale(1)"}}
+  >{children}</div>;
+};
+
+const SubTabs=({tabs,active,set,color=C.blue,bg=C.blueL})=>(
+  <div className="m3-seg">
+    {tabs.map(t=><button key={t.id} className="m3-seg-btn" onClick={()=>set(t.id)}
+      style={{background:active===t.id?"#fff":"transparent",color:active===t.id?color:C.text3,
+        fontWeight:active===t.id?700:500,
+        boxShadow:active===t.id?"0 1px 4px rgba(26,86,219,.12)":"none"}}>
+      {t.l}
+    </button>)}
   </div>
 );
-const Tag=({children,bg,col})=><span style={{background:bg,color:col,padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700}}>{children}</span>;
-const Chevron=({open})=><span style={{color:C.text3,fontSize:12,transform:`rotate(${open?180:0}deg)`,transition:"transform .2s",flexShrink:0}}>▼</span>;
+
+const Tag=({children,bg,col,size="sm"})=>(
+  <span style={{background:bg,color:col,padding:size==="sm"?"4px 12px":"6px 16px",
+    borderRadius:100,fontSize:size==="sm"?11:13,fontWeight:600,display:"inline-flex",
+    alignItems:"center",gap:4,letterSpacing:.2}}>
+    {children}
+  </span>
+);
+
+const Chevron=({open})=>(
+  <span style={{color:C.text3,fontSize:11,transform:`rotate(${open?180:0}deg)`,
+    transition:"transform .25s cubic-bezier(.4,0,.2,1)",flexShrink:0,
+    width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",
+    borderRadius:12,background:C.surf}}>▼</span>
+);
+
+const Pill=({children,active,onClick,color=C.blue,bg=C.blueL})=>(
+  <button onClick={onClick} style={{padding:"8px 18px",borderRadius:100,border:`1.5px solid ${active?color:C.borderL}`,
+    background:active?bg:"#fff",color:active?color:C.text2,fontWeight:active?700:500,
+    cursor:"pointer",fontSize:13,transition:"all .2s",letterSpacing:.2}}>
+    {children}
+  </button>
+);
+
+const SectionLabel=({children})=>(
+  <div style={{fontSize:10,fontWeight:700,letterSpacing:1.5,color:C.text3,
+    textTransform:"uppercase",marginBottom:10,paddingLeft:2}}>
+    {children}
+  </div>
+);
 
 // ── Setup ──────────────────────────────────────────────────────────────────
 function Setup({done}){
@@ -532,76 +637,121 @@ function HomeTab({pi,goals,setTab}){
   const d=pi?.data;
   const todayW=d?.week[jsToIdx[new Date().getDay()]];
   const GL={perder_peso:"Perder peso ⚖️",definir:"Definir 💪",bienestar:"Bienestar 🌿",rendimiento:"Rendimiento 🏆"};
-  const NavCard=({tab,accent,title,label,children})=>(
-    <div onClick={()=>setTab(tab)} style={{...card,cursor:"pointer",border:"2px solid transparent",position:"relative",overflow:"hidden"}}>
-      <div style={{position:"absolute",top:0,left:0,width:4,height:"100%",background:accent}}/>
-      <div style={{paddingLeft:8}}>
-        <div style={{fontSize:9,color:C.text3,fontWeight:700,letterSpacing:1,marginBottom:4}}>{label}</div>
-        <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:4}}>{title}</div>
-        {children}
+  const NavCard=({tab:tabId,accent,accentBg,title,label,icon,children})=>(
+    <div onClick={()=>setTab(tabId)} style={{background:"#fff",borderRadius:24,padding:"14px 16px",
+      marginBottom:10,boxShadow:"0 1px 3px rgba(26,86,219,.06),0 4px 12px rgba(26,86,219,.05)",
+      border:"1px solid rgba(194,198,208,.2)",cursor:"pointer",
+      display:"flex",alignItems:"center",gap:14,
+      transition:"transform .15s,box-shadow .15s",WebkitTapHighlightColor:"transparent"}}
+      onMouseDown={e=>e.currentTarget.style.transform="scale(.985)"}
+      onMouseUp={e=>e.currentTarget.style.transform="scale(1)"}
+      onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
+      {/* Icon container */}
+      <div style={{width:52,height:52,borderRadius:18,background:accentBg,
+        display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,flexShrink:0}}>
+        {icon}
       </div>
-      <div style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",color:accent,fontSize:22,opacity:.4}}>›</div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:9,color:C.text3,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:3}}>{label}</div>
+        <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:3,lineHeight:1.2}}>{title}</div>
+        <div style={{fontSize:12,color:C.text2}}>{children}</div>
+      </div>
+      <div style={{color:accent,fontSize:20,opacity:.5,flexShrink:0}}>›</div>
     </div>
   );
   return(
     <div>
-      {/* Phase hero */}
-      <div style={{background:d?.gradient,borderRadius:24,padding:"20px 18px",marginBottom:12,color:"#fff",boxShadow:`0 8px 32px ${d?.color}44`}}>
-        <div style={{fontSize:9,opacity:.6,fontWeight:700,letterSpacing:2,marginBottom:6}}>FASE ACTUAL</div>
-        <Row style={{justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
-          <div>
-            <div style={{fontFamily:"'Syne',sans-serif",fontSize:26,fontWeight:800,lineHeight:1}}>{d?.emoji} {d?.name}</div>
-            <div style={{fontSize:12,opacity:.8,marginTop:4,fontStyle:"italic"}}>{d?.tagline}</div>
+      {/* ── Phase hero — M3 Expressive large card ── */}
+      <div style={{background:d?.gradient,borderRadius:32,padding:"22px 20px 20px",marginBottom:12,color:"#fff",
+        boxShadow:`0 12px 40px ${d?.color}55`,position:"relative",overflow:"hidden",animation:"fd .4s ease"}}>
+        {/* Decorative blob */}
+        <div style={{position:"absolute",top:-40,right:-40,width:180,height:180,borderRadius:"50%",
+          background:"rgba(255,255,255,.06)",pointerEvents:"none"}}/>
+        <div style={{position:"absolute",bottom:-20,left:20,width:100,height:100,borderRadius:"50%",
+          background:"rgba(255,255,255,.04)",pointerEvents:"none"}}/>
+
+        <div style={{position:"relative"}}>
+          <div style={{fontSize:9,opacity:.55,fontWeight:700,letterSpacing:2.5,marginBottom:10,textTransform:"uppercase"}}>FASE ACTUAL</div>
+          <Row style={{justifyContent:"space-between",alignItems:"flex-start",marginBottom:18}}>
+            <div>
+              <div style={{fontFamily:"'Bricolage Grotesque',sans-serif",fontSize:32,fontWeight:800,lineHeight:.95,letterSpacing:-1.5,marginBottom:6}}>
+                {d?.emoji} {d?.name}
+              </div>
+              <div style={{fontSize:13,opacity:.75,fontStyle:"italic",fontWeight:300}}>{d?.tagline}</div>
+            </div>
+            {/* Giant day number — M3 hero element */}
+            <div style={{background:"rgba(0,0,0,.2)",borderRadius:24,padding:"12px 16px",textAlign:"center",
+              backdropFilter:"blur(12px)",border:"1px solid rgba(255,255,255,.15)",minWidth:68}}>
+              <div style={{fontFamily:"'Bricolage Grotesque',sans-serif",fontSize:36,fontWeight:800,lineHeight:1,letterSpacing:-2}}>{pi?.day}</div>
+              <div style={{fontSize:9,opacity:.6,letterSpacing:1.5,marginTop:2,fontWeight:600}}>DÍA</div>
+            </div>
+          </Row>
+          {/* Progress */}
+          <div style={{height:4,background:"rgba(255,255,255,.15)",borderRadius:2,overflow:"hidden",marginBottom:10}}>
+            <div style={{height:"100%",width:`${((pi?.day-1)/(pi?.cycleLen||28))*100}%`,
+              background:"rgba(255,255,255,.8)",borderRadius:2,transition:"width .8s cubic-bezier(.4,0,.2,1)"}}/>
           </div>
-          <div style={{background:"rgba(255,255,255,.18)",borderRadius:14,padding:"8px 14px",textAlign:"center",backdropFilter:"blur(8px)"}}>
-            <div style={{fontSize:28,fontWeight:800,lineHeight:1}}>{pi?.day}</div>
-            <div style={{fontSize:8,opacity:.7,marginTop:2,letterSpacing:1}}>DÍA</div>
-          </div>
-        </Row>
-        <div style={{height:5,background:"rgba(255,255,255,.15)",borderRadius:3,overflow:"hidden",marginBottom:10}}>
-          <div style={{height:"100%",width:`${((pi?.day-1)/(pi?.cycleLen||28))*100}%`,background:"rgba(255,255,255,.75)",borderRadius:3}}/>
+          <Row style={{justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontSize:12,opacity:.8,fontWeight:500}}>
+              <strong style={{fontWeight:800}}>{pi?.daysLeft} días</strong> en esta fase
+            </span>
+            <span style={{fontSize:11,opacity:.65,background:"rgba(255,255,255,.12)",
+              padding:"4px 12px",borderRadius:100,border:"1px solid rgba(255,255,255,.1)"}}>
+              📅 Regla en {pi?.daysToNext}d
+            </span>
+          </Row>
         </div>
-        <Row style={{justifyContent:"space-between"}}>
-          <span style={{fontSize:11,opacity:.85}}>Quedan <strong>{pi?.daysLeft} días</strong> en esta fase</span>
-          <span style={{fontSize:10,opacity:.6,background:"rgba(255,255,255,.12)",padding:"3px 8px",borderRadius:16}}>📅 Regla en {pi?.daysToNext}d</span>
-        </Row>
       </div>
 
-      {/* Stats */}
+      {/* ── Stats grid — M3 tonal cards ── */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
-        <Card style={{margin:0,padding:14}}>
-          <div style={{fontSize:9,color:C.text3,marginBottom:6,fontWeight:700,letterSpacing:1}}>INTENSIDAD HOY</div>
-          <div style={{fontSize:18,fontWeight:800,color:d?.color,marginBottom:6}}>{d?.intensity}</div>
-          <div style={{height:5,background:C.bg,borderRadius:3,overflow:"hidden"}}>
-            <div style={{height:"100%",width:`${d?.intensityPct}%`,background:d?.color,borderRadius:3}}/>
+        <div style={{background:d?.light,borderRadius:24,padding:16,border:`1px solid ${d?.color}22`}}>
+          <div style={{fontSize:9,color:d?.color,marginBottom:8,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase"}}>INTENSIDAD</div>
+          <div style={{fontFamily:"'Bricolage Grotesque',sans-serif",fontSize:22,fontWeight:800,color:d?.color,marginBottom:8,letterSpacing:-0.5}}>{d?.intensity}</div>
+          <div style={{height:5,background:`${d?.color}22`,borderRadius:3,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${d?.intensityPct}%`,background:d?.color,borderRadius:3,
+              transition:"width .8s cubic-bezier(.4,0,.2,1)"}}/>
           </div>
-        </Card>
-        <Card style={{margin:0,padding:14}}>
-          <div style={{fontSize:9,color:C.text3,marginBottom:6,fontWeight:700,letterSpacing:1}}>OBJETIVOS</div>
-          {goals.slice(0,2).map(g=><div key={g} style={{fontSize:11,color:C.text2,marginBottom:3}}>{GL[g]||g}</div>)}
-        </Card>
+          <div style={{fontSize:10,color:d?.color,marginTop:5,fontWeight:600,opacity:.7}}>{d?.intensityPct}%</div>
+        </div>
+        <div style={{background:C.surf,borderRadius:24,padding:16,border:`1px solid ${C.borderL}`}}>
+          <div style={{fontSize:9,color:C.text3,marginBottom:8,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase"}}>OBJETIVOS</div>
+          {goals.slice(0,2).map(g=>(
+            <div key={g} style={{fontSize:12,color:C.text2,marginBottom:4,fontWeight:500,display:"flex",alignItems:"center",gap:5}}>
+              <div style={{width:5,height:5,borderRadius:3,background:C.blue,flexShrink:0}}/>
+              {GL[g]||g}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div style={{fontSize:10,color:C.text3,fontWeight:700,letterSpacing:1,marginBottom:8}}>ACCESO RÁPIDO</div>
 
-      <NavCard tab="ciclo" accent={d?.color} label="CICLO HOY" title={`${d?.emoji} ${d?.tagline}`}>
-        <div style={{fontSize:11,color:C.text2}}>{d?.insights?.[0]}</div>
+      <SectionLabel>ACCESO RÁPIDO</SectionLabel>
+
+      <NavCard tab="ciclo" accent={d?.color} accentBg={d?.light} icon={d?.emoji}
+        label="CICLO HOY" title={d?.tagline}>
+        <span style={{color:C.text3}}>{d?.insights?.[0]}</span>
       </NavCard>
 
-      <NavCard tab="nutri" accent={C.green} label="NUTRICIÓN HOY" title={`${d?.meals[0].ico} ${d?.meals[0].title}`}>
-        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-          {d?.focus.map(f=><Tag key={f} bg={C.greenL} col={C.green}>{f}</Tag>)}
+      <NavCard tab="nutri" accent={C.green} accentBg={C.greenL} icon={d?.meals[0].ico}
+        label="NUTRICIÓN HOY" title={d?.meals[0].title}>
+        {d?.focus.slice(0,3).map(f=><Tag key={f} bg={C.greenL} col={C.green}>{f}</Tag>).reduce((a,b)=>[a," ",b])}
+      </NavCard>
+
+      <NavCard tab="gym" accent={C.blue} accentBg={C.blueL} icon={todayW?.ico}
+        label="ENTRENO HOY" title={todayW?.name||"Descanso"}>
+        <span style={{color:C.blue,fontWeight:600}}>{todayW?.dur||""}</span>
+      </NavCard>
+
+      <div style={{background:d?.gradient,borderRadius:28,padding:"18px 20px",
+        color:"#fff",boxShadow:`0 8px 28px ${d?.color}44`,position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",top:-20,right:-20,width:120,height:120,borderRadius:"50%",background:"rgba(255,255,255,.05)",pointerEvents:"none"}}/>
+        <div style={{fontSize:9,color:"rgba(255,255,255,.55)",fontWeight:700,letterSpacing:2,marginBottom:10,textTransform:"uppercase"}}>💡 Consejo de fase</div>
+        <div style={{fontFamily:"'Bricolage Grotesque',sans-serif",fontSize:17,color:"#fff",lineHeight:1.6,fontStyle:"italic",fontWeight:400,position:"relative"}}>
+          "{d?.tip}"
         </div>
-      </NavCard>
-
-      <NavCard tab="gym" accent={C.blue} label="ENTRENO HOY" title={`${todayW?.ico} ${todayW?.name}`}>
-        <div style={{fontSize:11,color:C.blue}}>{todayW?.dur}</div>
-      </NavCard>
-
-      <Card style={{background:d?.gradient,border:"none"}}>
-        <div style={{fontSize:9,color:"rgba(255,255,255,.6)",fontWeight:700,letterSpacing:2,marginBottom:8}}>💡 CONSEJO DE FASE</div>
-        <div style={{fontSize:14,color:"#fff",lineHeight:1.65,fontStyle:"italic"}}>"{d?.tip}"</div>
-      </Card>
+      </div>
     </div>
   );
 }
@@ -1305,39 +1455,60 @@ function App(){
   const tabs=[{id:"home",i:"🏠",l:"Inicio"},{id:"ciclo",i:"🌙",l:"Ciclo"},{id:"nutri",i:"🥗",l:"Nutrición"},{id:"gym",i:"🏋️",l:"Entrena"},{id:"ia",i:"✨",l:"IA"}];
 
   return(
-    <div style={{fontFamily:"'DM Sans',sans-serif",maxWidth:430,margin:"0 auto",minHeight:"100vh",display:"flex",flexDirection:"column",background:C.bg}}>
-      {/* Header */}
-      <div style={{background:d?.gradient||"linear-gradient(145deg,#0F1E4A,#1A56DB)",padding:"18px 18px 24px",color:"#fff",flexShrink:0}}>
-        <Row style={{justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+    <div style={{fontFamily:"'Plus Jakarta Sans',sans-serif",maxWidth:430,margin:"0 auto",minHeight:"100vh",display:"flex",flexDirection:"column",background:C.bg}}>
+      {/* ── M3 Expressive Header ── */}
+      <div style={{background:d?.gradient||"linear-gradient(145deg,#0A1628,#1A56DB)",padding:"20px 18px 22px",color:"#fff",flexShrink:0,position:"relative",overflow:"hidden"}}>
+        {/* Decorative rings */}
+        <div style={{position:"absolute",top:-60,right:-60,width:200,height:200,borderRadius:"50%",background:"rgba(255,255,255,.04)",pointerEvents:"none"}}/>
+        <div style={{position:"absolute",top:-20,right:-20,width:120,height:120,borderRadius:"50%",background:"rgba(255,255,255,.04)",pointerEvents:"none"}}/>
+
+        {/* Top row: brand + day bubble + settings */}
+        <Row style={{justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,position:"relative"}}>
           <div>
-            <p style={{margin:0,fontSize:8,opacity:.55,letterSpacing:3,textTransform:"uppercase",fontWeight:700}}>
-              MEIRINS {dbOk===true?"· DB ✓":dbOk===false?"· offline":""}
-            </p>
-            <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:24,margin:"4px 0 0",fontWeight:800,lineHeight:1.1}}>{d?.emoji} Fase {d?.name}</h1>
-            <div style={{fontSize:11,opacity:.75,marginTop:3,fontStyle:"italic"}}>{d?.tagline}</div>
+            <Row style={{gap:6,alignItems:"center",marginBottom:6}}>
+              <div style={{width:6,height:6,borderRadius:3,background:dbOk===true?"#4ade80":dbOk===false?"#f87171":"rgba(255,255,255,.3)"}}/>
+              <span style={{fontSize:9,opacity:.55,letterSpacing:2.5,textTransform:"uppercase",fontWeight:600}}>
+                Meirins{dbOk===true?" · sync ✓":dbOk===false?" · offline":""}
+              </span>
+            </Row>
+            <h1 style={{fontFamily:"'Bricolage Grotesque',sans-serif",fontSize:28,fontWeight:800,lineHeight:1,letterSpacing:-1}}>
+              {d?.emoji} Fase {d?.name}
+            </h1>
+            <div style={{fontSize:12,opacity:.7,marginTop:5,fontStyle:"italic",fontWeight:300}}>{d?.tagline}</div>
           </div>
-          <Row style={{gap:8,alignItems:"flex-start"}}>
-            <div style={{background:"rgba(255,255,255,.15)",borderRadius:14,padding:"8px 12px",textAlign:"center",backdropFilter:"blur(8px)"}}>
-              <div style={{fontSize:26,fontWeight:800,lineHeight:1}}>{pi?.day}</div>
-              <div style={{fontSize:8,opacity:.65,marginTop:2,letterSpacing:1}}>DÍA</div>
+
+          <Row style={{gap:8,alignItems:"center"}}>
+            {/* Day bubble — M3 expressive hero number */}
+            <div style={{background:"rgba(255,255,255,.16)",borderRadius:20,padding:"10px 14px",textAlign:"center",backdropFilter:"blur(12px)",minWidth:58,border:"1px solid rgba(255,255,255,.18)"}}>
+              <div style={{fontFamily:"'Bricolage Grotesque',sans-serif",fontSize:30,fontWeight:800,lineHeight:1,letterSpacing:-1}}>{pi?.day}</div>
+              <div style={{fontSize:8,opacity:.6,marginTop:2,letterSpacing:1.5,fontWeight:600}}>DÍA</div>
             </div>
-            <button onClick={()=>setShowCfg(true)} style={{width:40,height:40,borderRadius:20,background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.2)",color:"#fff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              ⚙️
-            </button>
+            {/* Settings */}
+            <button onClick={()=>setShowCfg(true)} style={{width:42,height:42,borderRadius:21,background:"rgba(255,255,255,.14)",border:"1px solid rgba(255,255,255,.18)",color:"#fff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,backdropFilter:"blur(8px)"}}>⚙️</button>
           </Row>
         </Row>
+
+        {/* Progress bar */}
+        <div style={{height:3,background:"rgba(255,255,255,.12)",borderRadius:2,marginBottom:12,overflow:"hidden",position:"relative"}}>
+          <div style={{position:"absolute",left:0,top:0,height:"100%",width:`${((pi?.day-1)/(pi?.cycleLen||28))*100}%`,background:"rgba(255,255,255,.7)",borderRadius:2,transition:"width .6s cubic-bezier(.4,0,.2,1)"}}/>
+        </div>
+
+        {/* Stats pills */}
         <Row style={{gap:8}}>
-          <div style={{flex:1,background:"rgba(255,255,255,.12)",borderRadius:10,padding:"7px 12px",backdropFilter:"blur(8px)"}}>
-            <span style={{fontSize:11,opacity:.8}}>Quedan </span><strong style={{fontSize:11}}>{pi?.daysLeft} días</strong><span style={{fontSize:11,opacity:.8}}> · Regla en {pi?.daysToNext}d</span>
+          <div style={{flex:1,background:"rgba(255,255,255,.12)",borderRadius:100,padding:"7px 16px",backdropFilter:"blur(8px)",border:"1px solid rgba(255,255,255,.1)"}}>
+            <span style={{fontSize:12,opacity:.8}}>📅 </span>
+            <strong style={{fontSize:12}}>{pi?.daysLeft}d</strong>
+            <span style={{fontSize:12,opacity:.8}}> restantes · regla en {pi?.daysToNext}d</span>
           </div>
-          <div style={{background:"rgba(255,255,255,.12)",borderRadius:10,padding:"7px 12px",backdropFilter:"blur(8px)"}}>
-            <span style={{fontSize:13}}>💧</span><strong style={{fontSize:12}}> {todayWater}/8</strong>
+          <div style={{background:"rgba(255,255,255,.12)",borderRadius:100,padding:"7px 14px",backdropFilter:"blur(8px)",border:"1px solid rgba(255,255,255,.1)",flexShrink:0}}>
+            <span style={{fontSize:13}}>💧</span>
+            <strong style={{fontSize:12}}> {todayWater}/8</strong>
           </div>
         </Row>
       </div>
 
       {/* Content */}
-      <div style={{flex:1,overflowY:"auto",padding:"16px 14px 90px"}}>
+      <div style={{flex:1,overflowY:"auto",padding:"16px 14px 96px"}}>
         {tab==="home"&&<HomeTab pi={pi} goals={goals} setTab={setTab}/>}
         {tab==="ciclo"&&<CicloTab pi={pi} setLP={setLP} setCL={setCL} dailyLog={dLog} setDailyLog={setDailyLogSync}/>}
         {tab==="nutri"&&<NutriTab d={d} pi={pi} dailyLog={dLog} setDailyLog={setDailyLogSync}/>}
@@ -1345,18 +1516,17 @@ function App(){
         {tab==="ia"&&<IATab pi={pi} goals={goals} dailyLog={dLog}/>}
       </div>
 
-      {/* Bottom nav */}
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"min(430px,100%)",background:"#fff",borderTop:`1px solid ${C.borderL}`,display:"flex",padding:"6px 0 20px",boxShadow:"0 -4px 24px rgba(26,86,219,.08)",zIndex:100}}>
+      {/* ── M3 Navigation Bar ── */}
+      <nav className="m3-nav">
         {tabs.map(t=>(
-          <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,background:"none",border:"none",cursor:"pointer",padding:"4px 0",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-            <div style={{width:40,height:34,borderRadius:12,background:tab===t.id?C.blueL:"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .18s"}}>
-              <span style={{fontSize:tab===t.id?20:18}}>{t.i}</span>
+          <button key={t.id} className="m3-nav-btn" onClick={()=>setTab(t.id)}>
+            <div className={`m3-nav-pill${tab===t.id?" active":""}`}>
+              <span style={{fontSize:tab===t.id?22:19,transition:"font-size .2s cubic-bezier(.34,1.56,.64,1)"}}>{t.i}</span>
             </div>
-            <span style={{fontSize:9,color:tab===t.id?C.blue:C.text3,fontWeight:tab===t.id?800:400}}>{t.l}</span>
-            {tab===t.id&&<div style={{width:16,height:3,borderRadius:2,background:C.blue,marginTop:1}}/>}
+            <span className="m3-nav-label" style={{color:tab===t.id?C.blue:C.text3}}>{t.l}</span>
           </button>
         ))}
-      </div>
+      </nav>
 
       {/* Settings */}
       {showCfg&&<Settings pi={pi} goals={goals} diet={diet} td={td} lastPeriod={lp} cycleLen={cl} onClose={()=>setShowCfg(false)} setLP={setLP} setCL={setCL} setGoals={setGoals} setDiet={setDiet} setTd={setTd} onReset={()=>{localStorage.clear();window.location.reload();}}/>}

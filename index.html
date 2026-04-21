@@ -19,6 +19,7 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
     *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
     body{background:#EEF4FF;font-family:'DM Sans',sans-serif;overscroll-behavior:none;}
@@ -194,6 +195,126 @@ function getPhase(dateStr,len){if(!dateStr)return null;const s=new Date(dateStr)
 
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k)||"null");}catch{return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+
+// ══ SUPABASE ════════════════════════════════════════════════════════════════
+const SB_URL="https://lpcvkzmfemxziuhdmzpx.supabase.co";
+const SB_KEY="sb_publishable__JhEh4SY-q0NWRB5SO8-9Q_zLr_wszB";
+const sb=window.supabase.createClient(SB_URL,SB_KEY);
+
+// Device ID — identifica este dispositivo sin necesitar login
+function getDeviceId(){
+  let id=localStorage.getItem("meirins_device_id");
+  if(!id){
+    id=typeof crypto!=="undefined"&&crypto.randomUUID
+      ?crypto.randomUUID()
+      :"device_"+Date.now()+"_"+Math.random().toString(36).slice(2);
+    localStorage.setItem("meirins_device_id",id);
+  }
+  return id;
+}
+
+// Indicador de conexión
+let isOnline=navigator.onLine;
+window.addEventListener("online",()=>{isOnline=true;console.log("[Meirins] Online ✓");});
+window.addEventListener("offline",()=>{isOnline=false;console.log("[Meirins] Offline — usando localStorage");});
+
+// ── Sync profile ──────────────────────────────────────────────────────────
+async function syncProfile(data){
+  if(!isOnline)return;
+  try{
+    await sb.from("user_profiles").upsert({
+      device_id:getDeviceId(),
+      last_period:data.lastPeriod||null,
+      cycle_length:data.cycleLength||28,
+      train_days:data.trainDays||[1,2,4,5],
+      goals:data.goals||["bienestar"],
+      diet:data.diet||["sin_lactosa"],
+      updated_at:new Date().toISOString()
+    },{onConflict:"device_id"});
+  }catch(e){console.warn("[Meirins] syncProfile error:",e);}
+}
+
+// ── Sync daily log ────────────────────────────────────────────────────────
+async function syncDailyLog(date,data){
+  if(!isOnline)return;
+  try{
+    await sb.from("daily_logs").upsert({
+      device_id:getDeviceId(),
+      log_date:date,
+      mood:data.mood||null,
+      flow:data.flow!=null?data.flow:null,
+      symptoms:data.symptoms||[],
+      energy:data.energy||null,
+      sleep_quality:data.sleep||null,
+      water:data.water||0,
+      notes:data.notes||null,
+      updated_at:new Date().toISOString()
+    },{onConflict:"device_id,log_date"});
+  }catch(e){console.warn("[Meirins] syncDailyLog error:",e);}
+}
+
+// ── Sync workout log ──────────────────────────────────────────────────────
+async function syncWorkoutLog(date,data){
+  if(!isOnline)return;
+  try{
+    await sb.from("workout_logs").upsert({
+      device_id:getDeviceId(),
+      log_date:date,
+      status:data.status||null,
+      extra_sport:data.extraSport||null,
+      updated_at:new Date().toISOString()
+    },{onConflict:"device_id,log_date"});
+  }catch(e){console.warn("[Meirins] syncWorkoutLog error:",e);}
+}
+
+// ── Load all data from Supabase on startup ────────────────────────────────
+async function loadFromSupabase(){
+  if(!isOnline)return false;
+  try{
+    const did=getDeviceId();
+
+    // Profile
+    const{data:profile}=await sb.from("user_profiles").select("*").eq("device_id",did).single();
+    if(profile){
+      lsSet("meirins",{
+        lastPeriod:profile.last_period,
+        cycleLength:profile.cycle_length,
+        trainDays:profile.train_days,
+        goals:profile.goals,
+        diet:profile.diet
+      });
+    }
+
+    // Daily logs
+    const{data:logs}=await sb.from("daily_logs").select("*").eq("device_id",did);
+    if(logs&&logs.length>0){
+      const dl={};
+      logs.forEach(log=>{
+        dl[log.log_date]={
+          mood:log.mood,flow:log.flow,
+          symptoms:log.symptoms||[],
+          energy:log.energy,sleep:log.sleep_quality,
+          water:log.water||0,notes:log.notes
+        };
+      });
+      lsSet("meirins_diary",dl);
+    }
+
+    // Workout logs
+    const{data:wlogs}=await sb.from("workout_logs").select("*").eq("device_id",did);
+    if(wlogs&&wlogs.length>0){
+      const wl={};
+      wlogs.forEach(log=>{wl[log.log_date]={status:log.status,extraSport:log.extra_sport};});
+      lsSet("meirins_gym",wl);
+    }
+
+    console.log("[Meirins] Data loaded from Supabase ✓");
+    return true;
+  }catch(e){
+    console.warn("[Meirins] loadFromSupabase error:",e);
+    return false;
+  }
+}
 </script>
 
 <!-- ══ REACT COMPONENTS (Babel) ════════════════════════════════════════════ -->
@@ -1116,15 +1237,64 @@ function App(){
   const [diet,setDietS]=useState(sv.diet||["sin_lactosa"]);
   const [wLog,setWLog]=useState(lsGet("meirins_gym")||{});
   const [dLog,setDLog]=useState(lsGet("meirins_diary")||{});
+  const [dbOk,setDbOk]=useState(null); // null=loading, true=ok, false=offline
 
-  function persist(p,c,t,g,d){lsSet("meirins",{lastPeriod:p,cycleLength:c,trainDays:t,goals:g,diet:d});}
+  // Load from Supabase on startup
+  useEffect(()=>{
+    loadFromSupabase().then(ok=>{
+      setDbOk(ok);
+      if(ok){
+        // Reload state from localStorage after Supabase sync
+        const fresh=lsGet("meirins")||{};
+        if(fresh.lastPeriod){
+          setLpS(fresh.lastPeriod);
+          setClS(fresh.cycleLength||28);
+          setTdS(fresh.trainDays||[1,2,4,5]);
+          setGoalsS(fresh.goals||["bienestar"]);
+          setDietS(fresh.diet||["sin_lactosa"]);
+          setSetup(false);
+        }
+        setDLog(lsGet("meirins_diary")||{});
+        setWLog(lsGet("meirins_gym")||{});
+      }
+    });
+    setTimeout(()=>{const s=document.getElementById("splash");if(s)s.classList.add("hide");},900);
+  },[]);
+
+  function persist(p,c,t,g,d){
+    const data={lastPeriod:p,cycleLength:c,trainDays:t,goals:g,diet:d};
+    lsSet("meirins",data);
+    syncProfile(data); // sync to Supabase async
+  }
   const setLP=v=>{setLpS(v);persist(v,cl,td,goals,diet);};
   const setCL=v=>{setClS(v);persist(lp,v,td,goals,diet);};
   const setGoals=v=>{const val=typeof v==="function"?v(goals):v;setGoalsS(val);persist(lp,cl,td,val,diet);};
   const setDiet=v=>{const val=typeof v==="function"?v(diet):v;setDietS(val);persist(lp,cl,td,goals,val);};
   const setTd=v=>{const val=typeof v==="function"?v(td):v;setTdS(val);persist(lp,cl,val,goals,diet);};
 
-  useEffect(()=>{setTimeout(()=>{const s=document.getElementById("splash");if(s)s.classList.add("hide");},900);},[]);
+  // Enhanced setDailyLog that also syncs to Supabase
+  function setDailyLogSync(updater){
+    setDLog(prev=>{
+      const next=typeof updater==="function"?updater(prev):updater;
+      lsSet("meirins_diary",next);
+      // Sync only the changed date
+      const today=new Date().toISOString().split("T")[0];
+      if(next[today])syncDailyLog(today,next[today]);
+      return next;
+    });
+  }
+
+  // Enhanced setWLog that also syncs to Supabase
+  function setWLogSync(updater){
+    setWLog(prev=>{
+      const next=typeof updater==="function"?updater(prev):updater;
+      lsSet("meirins_gym",next);
+      // Sync only the changed date
+      const today=new Date().toISOString().split("T")[0];
+      if(next[today])syncWorkoutLog(today,next[today]);
+      return next;
+    });
+  }
 
   const pi=lp?getPhase(lp,cl):null;
   const d=pi?.data;
@@ -1140,7 +1310,9 @@ function App(){
       <div style={{background:d?.gradient||"linear-gradient(145deg,#0F1E4A,#1A56DB)",padding:"18px 18px 24px",color:"#fff",flexShrink:0}}>
         <Row style={{justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
           <div>
-            <p style={{margin:0,fontSize:8,opacity:.55,letterSpacing:3,textTransform:"uppercase",fontWeight:700}}>MEIRINS</p>
+            <p style={{margin:0,fontSize:8,opacity:.55,letterSpacing:3,textTransform:"uppercase",fontWeight:700}}>
+              MEIRINS {dbOk===true?"· DB ✓":dbOk===false?"· offline":""}
+            </p>
             <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:24,margin:"4px 0 0",fontWeight:800,lineHeight:1.1}}>{d?.emoji} Fase {d?.name}</h1>
             <div style={{fontSize:11,opacity:.75,marginTop:3,fontStyle:"italic"}}>{d?.tagline}</div>
           </div>
@@ -1167,9 +1339,9 @@ function App(){
       {/* Content */}
       <div style={{flex:1,overflowY:"auto",padding:"16px 14px 90px"}}>
         {tab==="home"&&<HomeTab pi={pi} goals={goals} setTab={setTab}/>}
-        {tab==="ciclo"&&<CicloTab pi={pi} setLP={setLP} setCL={setCL} dailyLog={dLog} setDailyLog={setDLog}/>}
-        {tab==="nutri"&&<NutriTab d={d} pi={pi} dailyLog={dLog} setDailyLog={setDLog}/>}
-        {tab==="gym"&&<EntrenoTab d={d} pi={pi} trainDays={td} wLog={wLog} setWLog={setWLog}/>}
+        {tab==="ciclo"&&<CicloTab pi={pi} setLP={setLP} setCL={setCL} dailyLog={dLog} setDailyLog={setDailyLogSync}/>}
+        {tab==="nutri"&&<NutriTab d={d} pi={pi} dailyLog={dLog} setDailyLog={setDailyLogSync}/>}
+        {tab==="gym"&&<EntrenoTab d={d} pi={pi} trainDays={td} wLog={wLog} setWLog={setWLogSync}/>}
         {tab==="ia"&&<IATab pi={pi} goals={goals} dailyLog={dLog}/>}
       </div>
 

@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Meirins — Ciclo & Energía</title>
+  <meta name="apple-mobile-web-app-title" content="Meirins"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="application-name" content="Meirins"/>
+  <meta name="msapplication-TileColor" content="#0F1E4A"/>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="icon" type="image/svg+xml" href="icon.svg"/>
+  <link rel="apple-touch-icon" href="icon-192.png"/>
+  <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png"/>
+  <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png"/>
+  <!-- iOS splash screens -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+    body{background:#EEF4FF;font-family:'DM Sans',sans-serif;overscroll-behavior:none;}
+    input[type=date]{color-scheme:light;}
+    ::-webkit-scrollbar{display:none;}
+    #splash{position:fixed;inset:0;background:linear-gradient(145deg,#0F1E4A,#1A56DB 55%,#059669);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity .6s;}
+    #splash.hide{opacity:0;pointer-events:none;}
+    @keyframes pu{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+    @keyframes su{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    @keyframes bk{0%,100%{opacity:1}50%{opacity:.3}}
+    .dot{width:7px;height:7px;border-radius:50%;background:#1A56DB;display:inline-block;animation:bk 1.2s ease-in-out infinite;}
+    .dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
+  </style>
+</head>
+<body>
+<div id="splash">
+  <div style="font-size:72px;animation:pu 2s infinite">⚡</div>
+  <div style="font-family:'Syne',sans-serif;font-size:44px;color:white;font-weight:800;letter-spacing:-1px;margin-top:10px">Meirins</div>
+  <div style="color:rgba(255,255,255,.5);font-size:10px;letter-spacing:4px;text-transform:uppercase;margin-top:8px">CICLO · ENERGÍA · FUERZA</div>
+</div>
+<div id="root"></div>
+
+<!-- ══ DATA (no Babel needed) ══════════════════════════════════════════════ -->
+<script>
+const C={
+  blue:"#1A56DB",blueD:"#0F1E4A",blueL:"#EEF4FF",blueM:"rgba(26,86,219,.1)",
+  green:"#059669",greenL:"#ECFDF5",greenM:"rgba(5,150,105,.1)",
+  cyan:"#0891B2",cyanL:"#ECFEFF",cyanM:"rgba(8,145,178,.1)",
+  indigo:"#4F46E5",indigoL:"#EEF2FF",indigoM:"rgba(79,70,229,.1)",
+  teal:"#0D9488",tealL:"#F0FDFA",tealM:"rgba(13,148,136,.1)",
+  bg:"#EEF4FF",card:"#FFFFFF",
+  text:"#0F172A",text2:"#475569",text3:"#94A3B8",
+  border:"#BFDBFE",borderL:"#E0EAFF"
+};
+
+const PH_DATA={
+  menstrual:{name:"Menstrual",emoji:"🌑",color:C.indigo,light:C.indigoL,mid:C.indigoM,
+    tagline:"Restauración & Descanso",gradient:"linear-gradient(135deg,#1e1b4b,#4F46E5)",
+    desc:"Tu cuerpo se renueva. Estrógenos y progesterona en mínimos. Momento de descanso y alimentos antiinflamatorios.",
+    insights:["Menor concentración → prioriza tareas sencillas","Necesitas más sueño","Sensibilidad al dolor elevada → baja la intensidad","Temperatura corporal ligeramente mayor"],
+    focus:["Hierro","Magnesio","Omega-3","Antiinflamatorios"],kcal:"Déficit suave · −200 kcal/día",intensity:"Muy baja",intensityPct:20,
+    tip:"El descanso activo tiene tanto valor como el entreno intenso. Tu cuerpo trabaja internamente.",
+    meals:[
+      {t:"Desayuno",ico:"🌾",title:"Porridge reconfortante",items:["Avena con leche de avena","Plátano + semillas de chía","Canela y miel"],
+       recipe:{ingredients:["80g copos de avena","200ml leche de avena","1 plátano maduro","1 cdta semillas de chía","½ cdta canela","1 cdta miel"],steps:["Calienta la leche a fuego medio.","Añade la avena y cocina 4-5 min removiendo.","Vierte en un bol y lamina el plátano encima.","Añade la chía, canela y miel."]}},
+      {t:"Almuerzo",ico:"🐟",title:"Salmón antiinflamatorio",items:["Salmón al horno 150g","Quinoa 80g + espinacas","Limón y aceite de oliva"],
+       recipe:{ingredients:["150g salmón","80g quinoa","100g espinacas","1 limón","2 cdas aceite oliva","Sal, pimienta, eneldo"],steps:["Horno 180°C. Salpimienta el salmón y hornea 15-18 min.","Cuece la quinoa (1:2 agua, 15 min).","Saltea las espinacas 2 min.","Sirve con limón."]}},
+      {t:"Cena",ico:"🍲",title:"Crema de lentejas rojas",items:["Crema de lentejas rojas","Pan de centeno tostado","Jengibre fresco rallado"],
+       recipe:{ingredients:["150g lentejas rojas","½ cebolla","1 zanahoria","1 cdta jengibre","½ cdta cúrcuma","500ml caldo","1 cda aceite oliva"],steps:["Sofríe cebolla y zanahoria 5 min.","Añade lentejas, jengibre, cúrcuma y caldo. Cuece 20 min.","Tritura con batidora.","Sirve con pan de centeno."]}},
+      {t:"Snacks",ico:"🍫",title:"Caprichos con propósito",items:["Chocolate negro 85% · 20g","Nueces · 30g","Infusión jengibre-cúrcuma"],
+       recipe:{ingredients:["20g chocolate 85%","30g nueces","1 taza agua","1 rodaja jengibre","½ cdta cúrcuma","1 cdta miel"],steps:["Hierve el agua con jengibre y cúrcuma.","Reposa 5 min, cuela y añade miel.","Disfruta con chocolate y nueces."]}}],
+    week:[
+      {d:"L",name:"Yoga restaurativo",dur:"30'",ico:"🧘",on:true,exercises:[{name:"Postura del niño",dur:"3 min"},{name:"Torsión espinal suave",dur:"2 min c/lado"},{name:"Piernas en la pared",dur:"5 min"},{name:"Savasana",dur:"10 min"}]},
+      {d:"M",name:"Paseo suave",dur:"20'",ico:"🚶",on:true,exercises:[{name:"Caminata cómoda",dur:"20 min"}]},
+      {d:"X",name:"Pilates suave",dur:"40'",ico:"🤸",on:true,exercises:[{name:"The Hundred (mod.)",sets:3,reps:"10 resp"},{name:"Roll Up suave",sets:3,reps:"8"},{name:"Single Leg Stretch",sets:2,reps:"10 c/lado"},{name:"Glute Bridge",sets:3,reps:"12"}]},
+      {d:"J",name:"Descanso total",dur:"",ico:"😴",on:false,exercises:[]},
+      {d:"V",name:"Estiramientos",dur:"30'",ico:"🙆",on:true,exercises:[{name:"Estiramiento caderas",dur:"2 min c/lado"},{name:"Apertura de pecho",dur:"3 min"},{name:"Relajación",dur:"10 min"}]},
+      {d:"S",name:"Paseo en naturaleza",dur:"30'",ico:"🌿",on:true,exercises:[{name:"Caminata natural",dur:"30 min"}]},
+      {d:"D",name:"Descanso",dur:"",ico:"😴",on:false,exercises:[]}]},
+  follicular:{name:"Folicular",emoji:"🌒",color:C.green,light:C.greenL,mid:C.greenM,
+    tagline:"Energía & Crecimiento",gradient:"linear-gradient(135deg,#064E3B,#059669)",
+    desc:"Los estrógenos suben progresivamente. Energía, memoria y motivación en auge. Momento ideal para rutinas exigentes.",
+    insights:["Mayor claridad mental y planificación","Metabolismo más eficiente","Mejor tolerancia al dolor","Fuerza muscular en aumento"],
+    focus:["Proteína magra","Carbohidratos complejos","Probióticos","Zinc"],kcal:"Déficit moderado · −300 kcal/día",intensity:"Alta",intensityPct:80,
+    tip:"¡Aprovecha esta ventana! Tu fuerza es superior. Intenta superar tus marcas personales.",
+    meals:[
+      {t:"Desayuno",ico:"🥚",title:"Tortilla energética",items:["3 huevos + espinacas","Aguacate ½ · tostada centeno","Café o té verde"],
+       recipe:{ingredients:["3 huevos","60g espinacas","½ aguacate","1 rebanada pan centeno","Sal, pimienta, aceite"],steps:["Bate los huevos con sal y pimienta.","Saltea espinacas 1 min.","Añade huevos y cuaja 3-4 min.","Sirve con aguacate en tostada."]}},
+      {t:"Almuerzo",ico:"🍗",title:"Bowl de fuerza",items:["Pechuga de pollo 150g","Quinoa 80g + brócoli","Comino y limón"],
+       recipe:{ingredients:["150g pechuga","80g quinoa","150g brócoli","1 limón","½ cdta comino","2 cdas aceite oliva"],steps:["Cuece quinoa 15 min. Vaporiza brócoli 8 min.","Sazona pollo con comino y plancha 6-7 min por lado.","Monta bowl y aliña con limón."]}},
+      {t:"Cena",ico:"🐠",title:"Merluza al papillote",items:["Merluza al papillote 150g","Boniato asado 120g","Ensalada con pepitas"],
+       recipe:{ingredients:["150g merluza","120g boniato","80g ensalada","15g pepitas calabaza","Limón, aceite, sal, hierbas"],steps:["Horno 200°C.","Envuelve merluza con limón y hierbas. Hornea 15 min.","Hornea boniato en cubos 25 min.","Sirve con ensalada y pepitas."]}},
+      {t:"Snacks",ico:"🥕",title:"Energía limpia",items:["Fruta de temporada","Hummus con crudités","Kombucha natural"],
+       recipe:{ingredients:["1 fruta","80g hummus","100g zanahoria y apio","250ml kombucha"],steps:["Corta verduras en bastones.","Dipea en hummus.","Acompaña con fruta y kombucha."]}}],
+    week:[
+      {d:"L",name:"HIIT",dur:"30'",ico:"🔥",on:true,exercises:[{name:"Burpees",sets:4,reps:"12"},{name:"Jump squats",sets:3,reps:"15"},{name:"Mountain climbers",sets:3,dur:"45s"},{name:"Push-ups",sets:3,reps:"12"}]},
+      {d:"M",name:"Fuerza · Piernas",dur:"45'",ico:"🦵",on:true,exercises:[{name:"Sentadilla con peso",sets:4,reps:"12"},{name:"Peso muerto",sets:3,reps:"10"},{name:"Zancadas alternadas",sets:3,reps:"12 c/lado"},{name:"Hip thrust",sets:4,reps:"15"}]},
+      {d:"X",name:"Carrera continua",dur:"30'",ico:"🏃",on:true,exercises:[{name:"Calentamiento caminando",dur:"5 min"},{name:"Carrera constante",dur:"20 min"},{name:"Vuelta a la calma",dur:"5 min"}]},
+      {d:"J",name:"Fuerza · Upper",dur:"45'",ico:"💪",on:true,exercises:[{name:"Press banca o flexiones",sets:4,reps:"12"},{name:"Remo con mancuerna",sets:3,reps:"12 c/lado"},{name:"Press hombros",sets:3,reps:"12"},{name:"Curl bíceps",sets:3,reps:"15"}]},
+      {d:"V",name:"HIIT / CrossFit",dur:"30'",ico:"🔥",on:true,exercises:[{name:"Box jumps",sets:4,reps:"10"},{name:"Kettlebell swings",sets:4,reps:"15"},{name:"Battle ropes",sets:3,dur:"30s"}]},
+      {d:"S",name:"Deporte outdoor",dur:"60'",ico:"🚴",on:true,exercises:[{name:"Bici, senderismo o natación",dur:"60 min"}]},
+      {d:"D",name:"Descanso activo",dur:"20'",ico:"🧘",on:true,exercises:[{name:"Yoga suave",dur:"20 min"}]}]},
+  ovulation:{name:"Ovulación",emoji:"🌕",color:C.cyan,light:C.cyanL,mid:C.cyanM,
+    tagline:"Pico de Potencia",gradient:"linear-gradient(135deg,#0C4A6E,#0891B2)",
+    desc:"El pico de LH y estrógenos te lleva a tu máximo absoluto. Fuerza, resistencia y carisma en su punto más alto.",
+    insights:["Pico hormonal: LH + estrógenos al máximo","Temperatura basal sube 0.2-0.5°C","Mayor sociabilidad y comunicación","Recuperación muscular más rápida"],
+    focus:["Zinc","Antioxidantes","Fibra","Comidas ligeras"],kcal:"Déficit moderado · −250 kcal/día",intensity:"Máxima",intensityPct:100,
+    tip:"¡Bate tus récords! Tu cuerpo está en su pico absoluto. El momento ideal para nuevos retos.",
+    meals:[
+      {t:"Desayuno",ico:"🍓",title:"Smoothie bowl",items:["Leche de coco 200ml","Frutos rojos 100g","Pepitas · granola sin gluten"],
+       recipe:{ingredients:["200ml leche de coco","100g frutos rojos","30g granola sin gluten","15g pepitas","1 cdta miel"],steps:["Tritura frutos rojos con leche de coco.","Vierte en bol.","Decora con granola y pepitas.","Añade miel."]}},
+      {t:"Almuerzo",ico:"🍤",title:"Ensalada proteica",items:["Gambas a la plancha 150g","Aguacate + pepino + rúcula","Sésamo · limón"],
+       recipe:{ingredients:["150g gambas","1 aguacate","½ pepino","60g rúcula","10g sésamo","Limón y aceite"],steps:["Plancha las gambas 2-3 min por lado.","Lamina aguacate, corta pepino.","Monta ensalada con rúcula.","Aliña y espolvorea sésamo."]}},
+      {t:"Cena",ico:"🦃",title:"Pavo & fibra",items:["Pavo a la plancha 150g","Espárragos asados","Arroz integral 70g"],
+       recipe:{ingredients:["150g pavo","150g espárragos","70g arroz integral","Aceite, ajo, sal, pimentón"],steps:["Cuece arroz 30-35 min.","Asa espárragos 200°C 15 min.","Plancha pavo 5-6 min por lado.","Sirve con pimentón."]}},
+      {t:"Snacks",ico:"🌱",title:"Antioxidantes",items:["Pepitas de calabaza · 30g","Frutos rojos frescos","Matcha latte de avena"],
+       recipe:{ingredients:["30g pepitas","100g frutos rojos","1 cdta matcha","200ml leche avena","1 cdta miel"],steps:["Disuelve matcha en agua caliente.","Calienta leche y añade al matcha.","Endulza con miel.","Acompaña con frutos y pepitas."]}}],
+    week:[
+      {d:"L",name:"Carrera intensa",dur:"45'",ico:"🏃",on:true,exercises:[{name:"Calentamiento",dur:"10 min"},{name:"Intervalos 1min/1min",sets:10,reps:"x"},{name:"Vuelta a la calma",dur:"5 min"}]},
+      {d:"M",name:"Fuerza total",dur:"50'",ico:"🏋️",on:true,exercises:[{name:"Sentadilla con barra",sets:5,reps:"8"},{name:"Peso muerto",sets:4,reps:"8"},{name:"Press banca",sets:4,reps:"8"},{name:"Dominadas",sets:4,reps:"8"}]},
+      {d:"X",name:"Boxeo / CrossFit",dur:"45'",ico:"🥊",on:true,exercises:[{name:"Comba",dur:"5 min"},{name:"Combinaciones boxeo",sets:5,dur:"2 min"},{name:"Thruster mancuernas",sets:4,reps:"12"}]},
+      {d:"J",name:"Fuerza + Cardio",dur:"50'",ico:"🔥",on:true,exercises:[{name:"Circuit: sentadilla + press",sets:5,reps:"10 c/u"},{name:"AMRAP: burpees + remo",dur:"10 min"},{name:"Plancha y hollow body",sets:3,dur:"45s"}]},
+      {d:"V",name:"Deporte outdoor",dur:"60'",ico:"⛰️",on:true,exercises:[{name:"Senderismo, escalada o trail",dur:"60 min"}]},
+      {d:"S",name:"Actividad social",dur:"60'",ico:"🏊",on:true,exercises:[{name:"Natación, pádel o tenis",dur:"60 min"}]},
+      {d:"D",name:"Descanso",dur:"",ico:"😴",on:false,exercises:[]}]},
+  luteal:{name:"Lútea",emoji:"🌖",color:C.teal,light:C.tealL,mid:C.tealM,
+    tagline:"Calma & Equilibrio",gradient:"linear-gradient(135deg,#042f2e,#0D9488)",
+    desc:"La progesterona toma el mando. Tu metabolismo se acelera. Nutre tu cuerpo para navegar el SPM con equilibrio.",
+    insights:["Temperatura elevada → bebe más agua","Posibles cambios de humor → más magnesio","Mayor apetito → carbohidratos complejos","Retención de líquidos → reduce la sal"],
+    focus:["Carbohidratos complejos","Triptófano","Magnesio","Anti-cravings"],kcal:"Mantenimiento · +100-150 kcal",intensity:"Moderada",intensityPct:40,
+    tip:"Ve reduciendo la intensidad progresivamente. Prioriza la recuperación.",
+    meals:[
+      {t:"Desayuno",ico:"🍞",title:"Desayuno saciante",items:["2 tostadas integrales · huevo poché","Aguacate + tomate cherry","Semillas de girasol"],
+       recipe:{ingredients:["2 tostadas integrales","2 huevos","½ aguacate","80g tomate cherry","15g semillas girasol","Vinagre, sal, pimienta"],steps:["Tuesta el pan. Agua con vinagre casi al hervor.","Desliza huevo al agua y cuece 3-4 min.","Machaca aguacate en tostadas.","Coloca huevo, tomates y semillas."]}},
+      {t:"Almuerzo",ico:"🥗",title:"Bowl vegetal",items:["Tofu firme 150g salteado","Arroz integral 80g","Verduras al wok · tamari"],
+       recipe:{ingredients:["150g tofu firme","80g arroz integral","150g verduras mixtas","1 cda tamari","1 cda aceite sésamo","Jengibre y sésamo"],steps:["Cuece arroz 30 min.","Dora tofu en cubos.","Saltea verduras, añade tamari y tofu.","Sirve con arroz y sésamo."]}},
+      {t:"Cena",ico:"🍜",title:"Sopa reconfortante",items:["Caldo de pollo casero","Pollo desmenuzado 100g","Fideos de arroz + verduras"],
+       recipe:{ingredients:["600ml caldo pollo","100g pollo desmenuzado","80g fideos arroz","100g verduras","Sal, perejil"],steps:["Calienta caldo con verduras 10 min.","Añade fideos, cuece 5-7 min.","Incorpora pollo 2 min.","Sirve con perejil."]}},
+      {t:"Snacks",ico:"🍌",title:"Antojos inteligentes",items:["Plátano + mantequilla almendra","Chocolate negro 85% · 20g","Dátiles 2-3 uds"],
+       recipe:{ingredients:["1 plátano","1 cda mantequilla almendra","20g chocolate 85%","2-3 dátiles"],steps:["Corta plátano en rodajas.","Unta mantequilla de almendra.","Acompaña con dátiles y chocolate.","Tip: congela 1h para textura tipo helado."]}}],
+    week:[
+      {d:"L",name:"Pilates",dur:"45'",ico:"🤸",on:true,exercises:[{name:"The Hundred",sets:3,reps:"10 resp"},{name:"Roll Up",sets:3,reps:"8"},{name:"Side Kick series",sets:2,reps:"12 c/lado"},{name:"Swimming",sets:3,dur:"30s"}]},
+      {d:"M",name:"Fuerza moderada",dur:"40'",ico:"💪",on:true,exercises:[{name:"Sentadilla con mancuernas",sets:3,reps:"12"},{name:"Peso muerto suave",sets:3,reps:"10"},{name:"Remo con banda",sets:3,reps:"15"},{name:"Glute bridge",sets:3,reps:"15"}]},
+      {d:"X",name:"Yoga flow",dur:"45'",ico:"🧘",on:true,exercises:[{name:"Saludo al sol ×5",dur:"10 min"},{name:"Guerrero I y II",dur:"3 min c/lado"},{name:"Torsiones suaves",dur:"5 min"},{name:"Yin yoga suelo",dur:"15 min"}]},
+      {d:"J",name:"Caminata rápida",dur:"45'",ico:"🚶",on:true,exercises:[{name:"Caminata a paso rápido",dur:"45 min"}]},
+      {d:"V",name:"Natación suave",dur:"30'",ico:"🏊",on:true,exercises:[{name:"Crol suave",sets:5,reps:"2 largos"},{name:"Espalda",sets:4,reps:"2 largos"},{name:"Flotación",dur:"5 min"}]},
+      {d:"S",name:"Estiramientos",dur:"30'",ico:"🙆",on:true,exercises:[{name:"Estiramiento cuerpo completo",dur:"30 min"}]},
+      {d:"D",name:"Descanso total",dur:"",ico:"😴",on:false,exercises:[]}]}
+};
+
+const ING={
+  menstrual:[
+    {cat:"🐟 Pescados",items:[{name:"Salmón fresco",qty:150,unit:"g"}]},
+    {cat:"🌾 Cereales",items:[{name:"Avena",qty:50,unit:"g"},{name:"Quinoa",qty:80,unit:"g"},{name:"Pan de centeno",qty:40,unit:"g"},{name:"Lentejas rojas",qty:80,unit:"g"}]},
+    {cat:"🥬 Verduras",items:[{name:"Espinacas",qty:100,unit:"g"},{name:"Zanahoria",qty:80,unit:"g"}]},
+    {cat:"🍌 Frutas",items:[{name:"Plátano",qty:1,unit:"ud"},{name:"Limones",qty:1,unit:"ud"}]},
+    {cat:"🥜 Semillas",items:[{name:"Nueces",qty:30,unit:"g"},{name:"Semillas de chía",qty:10,unit:"g"}]},
+    {cat:"🫙 Despensa",items:[{name:"Leche de avena",qty:200,unit:"ml"},{name:"Chocolate negro 85%",qty:20,unit:"g"},{name:"Aceite oliva",qty:15,unit:"ml"},{name:"Miel",qty:10,unit:"g"},{name:"Jengibre fresco",qty:10,unit:"g"},{name:"Cúrcuma",qty:2,unit:"g"}]}],
+  follicular:[
+    {cat:"🥩 Proteínas",items:[{name:"Pechuga de pollo",qty:150,unit:"g"},{name:"Merluza",qty:150,unit:"g"},{name:"Huevos",qty:3,unit:"uds"}]},
+    {cat:"🌾 Cereales",items:[{name:"Quinoa",qty:80,unit:"g"},{name:"Pan de centeno",qty:40,unit:"g"},{name:"Boniato",qty:120,unit:"g"}]},
+    {cat:"🥬 Verduras",items:[{name:"Espinacas",qty:60,unit:"g"},{name:"Brócoli",qty:150,unit:"g"},{name:"Zanahoria",qty:100,unit:"g"}]},
+    {cat:"🥑 Frutas",items:[{name:"Aguacate",qty:1,unit:"ud"},{name:"Limones",qty:1,unit:"ud"},{name:"Fruta temporada",qty:1,unit:"ud"}]},
+    {cat:"🫙 Despensa",items:[{name:"Hummus",qty:60,unit:"g"},{name:"Kombucha",qty:250,unit:"ml"},{name:"Aceite oliva",qty:15,unit:"ml"}]}],
+  ovulation:[
+    {cat:"🦐 Proteínas",items:[{name:"Gambas",qty:150,unit:"g"},{name:"Pavo filetes",qty:150,unit:"g"}]},
+    {cat:"🌾 Cereales",items:[{name:"Arroz integral",qty:70,unit:"g"},{name:"Granola sin gluten",qty:40,unit:"g"}]},
+    {cat:"🥬 Verduras",items:[{name:"Espárragos",qty:150,unit:"g"},{name:"Pepino",qty:100,unit:"g"},{name:"Rúcula",qty:60,unit:"g"}]},
+    {cat:"🍓 Frutas",items:[{name:"Frutos rojos",qty:200,unit:"g"},{name:"Aguacate",qty:1,unit:"ud"},{name:"Limones",qty:1,unit:"ud"}]},
+    {cat:"🫙 Despensa",items:[{name:"Leche de coco",qty:200,unit:"ml"},{name:"Leche de avena",qty:200,unit:"ml"},{name:"Matcha",qty:2,unit:"g"},{name:"Aceite oliva",qty:15,unit:"ml"}]}],
+  luteal:[
+    {cat:"🥩 Proteínas",items:[{name:"Tofu firme",qty:150,unit:"g"},{name:"Pollo muslos",qty:150,unit:"g"},{name:"Huevos",qty:2,unit:"uds"}]},
+    {cat:"🌾 Cereales",items:[{name:"Pan integral",qty:80,unit:"g"},{name:"Arroz integral",qty:80,unit:"g"},{name:"Fideos de arroz",qty:80,unit:"g"}]},
+    {cat:"🥬 Verduras",items:[{name:"Tomate cherry",qty:80,unit:"g"},{name:"Verduras para wok",qty:150,unit:"g"}]},
+    {cat:"🥑 Frutas",items:[{name:"Aguacate",qty:1,unit:"ud"},{name:"Plátano",qty:1,unit:"ud"},{name:"Dátiles",qty:3,unit:"uds"}]},
+    {cat:"🫙 Despensa",items:[{name:"Caldo de pollo",qty:400,unit:"ml"},{name:"Chocolate negro 85%",qty:20,unit:"g"},{name:"Tamari",qty:15,unit:"ml"},{name:"Aceite sésamo",qty:15,unit:"ml"}]}]
+};
+
+const SYMPTOMS=[{id:"cramping",l:"Cólicos",i:"😣"},{id:"bloating",l:"Hinchazón",i:"🫧"},{id:"headache",l:"Dolor cabeza",i:"🤕"},{id:"breast",l:"Pechos",i:"💗"},{id:"acne",l:"Acné",i:"😤"},{id:"fatigue",l:"Fatiga",i:"😴"},{id:"cravings",l:"Antojos",i:"🍫"},{id:"mood",l:"Cambios humor",i:"🎭"},{id:"spotting",l:"Spotting",i:"🩸"},{id:"nausea",l:"Náuseas",i:"🤢"}];
+const MOODS=[{id:"amazing",l:"Genial",i:"🌟"},{id:"good",l:"Bien",i:"😊"},{id:"okay",l:"Regular",i:"😐"},{id:"low",l:"Baja",i:"😔"},{id:"bad",l:"Mal",i:"😢"}];
+const FLOW=[{id:0,l:"Sin regla"},{id:1,l:"Spotting"},{id:2,l:"Ligero"},{id:3,l:"Moderado"},{id:4,l:"Abundante"}];
+const jsToIdx={1:0,2:1,3:2,4:3,5:4,6:5,0:6};
+const DAY_L=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+const DAY_S=["D","L","M","X","J","V","S"];
+const GOAL_OPTS=[{id:"perder_peso",l:"Perder peso",i:"⚖️"},{id:"definir",l:"Definir músculo",i:"💪"},{id:"bienestar",l:"Bienestar",i:"🌿"},{id:"rendimiento",l:"Rendimiento",i:"🏆"}];
+const DIET_OPTS=[{id:"sin_lactosa",l:"Sin lactosa",i:"🥛"},{id:"sin_gluten",l:"Sin gluten",i:"🌾"},{id:"vegetariana",l:"Vegetariana",i:"🥦"},{id:"vegana",l:"Vegana",i:"🌱"}];
+
+function fmtQty(q,u){const r=Math.ceil(q);if(u==="g"&&q>=1000)return`${(q/1000).toFixed(1).replace(/\.0$/,"")} kg`;if(u==="ml"&&q>=1000)return`${(q/1000).toFixed(1).replace(/\.0$/,"")} L`;if(u==="ud"||u==="uds")return`${r} ${r===1?"unidad":"unidades"}`;return`${r} ${u}`;}
+
+function buildShop(wDays,adults,children){const p=adults+children*0.6;const pd={};wDays.forEach(d=>{pd[d.phase]=(pd[d.phase]||0)+1;});const m={};Object.entries(pd).forEach(([ph,days])=>{ING[ph].forEach(cat=>{cat.items.forEach(item=>{const k=item.name+"_"+item.unit;if(!m[k])m[k]={name:item.name,unit:item.unit,qty:0,cat:cat.cat};m[k].qty+=item.qty*days*p;});});});const bc={};Object.values(m).forEach(it=>{if(!bc[it.cat])bc[it.cat]=[];bc[it.cat].push(it);});return bc;}
+
+function getPhase(dateStr,len){if(!dateStr)return null;const s=new Date(dateStr);s.setHours(0,0,0,0);const t=new Date();t.setHours(0,0,0,0);const diff=Math.round((t-s)/86400000);const day=(diff%len)+1;const phase=day<=5?"menstrual":day<=13?"follicular":day<=16?"ovulation":"luteal";const nextDay=phase==="menstrual"?6:phase==="follicular"?14:phase==="ovulation"?17:len+1;const np=new Date(s);np.setDate(s.getDate()+len);return{phase,day,daysLeft:Math.max(nextDay-day,0),data:PH_DATA[phase],cycleLen:len,nextPeriod:np,daysToNext:Math.max(0,Math.round((np-t)/86400000))};}
+
+function lsGet(k){try{return JSON.parse(localStorage.getItem(k)||"null");}catch{return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+</script>
+
+<!-- ══ REACT COMPONENTS (Babel) ════════════════════════════════════════════ -->
+<script type="text/babel">
+const {useState,useEffect,useRef,useMemo}=React;
+
+// ── Shared styles ──────────────────────────────────────────────────────────
+const card={background:"#fff",borderRadius:20,padding:16,marginBottom:12,boxShadow:"0 2px 16px rgba(26,86,219,.07)"};
+const Row=({children,style={}})=><div style={{display:"flex",alignItems:"center",...style}}>{children}</div>;
+const Card=({children,style={},onClick})=><div onClick={onClick} style={{...card,...style,cursor:onClick?"pointer":"default"}}>{children}</div>;
+const SubTabs=({tabs,active,set,color=C.blue})=>(
+  <div style={{display:"flex",background:"#fff",borderRadius:50,padding:4,marginBottom:14,boxShadow:"0 2px 10px rgba(26,86,219,.08)"}}>
+    {tabs.map(t=><button key={t.id} onClick={()=>set(t.id)} style={{flex:1,padding:"9px 4px",borderRadius:46,border:"none",fontSize:11,fontWeight:active===t.id?800:500,background:active===t.id?color:"transparent",color:active===t.id?"#fff":C.text3,cursor:"pointer"}}>{t.l}</button>)}
+  </div>
+);
+const Tag=({children,bg,col})=><span style={{background:bg,color:col,padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700}}>{children}</span>;
+const Chevron=({open})=><span style={{color:C.text3,fontSize:12,transform:`rotate(${open?180:0}deg)`,transition:"transform .2s",flexShrink:0}}>▼</span>;
+
+// ── Setup ──────────────────────────────────────────────────────────────────
+function Setup({done}){
+  const [step,setStep]=useState(0);
+  const [date,setDate]=useState("");
+  const [len,setLen]=useState(28);
+  const [goals,setGoals]=useState(["bienestar"]);
+  const [diet,setDiet]=useState(["sin_lactosa"]);
+  const [td,setTd]=useState([1,2,4,5]);
+  const today=new Date().toISOString().split("T")[0];
+  const toggleG=g=>setGoals(p=>p.includes(g)?p.length>1?p.filter(x=>x!==g):p:[...p,g]);
+  const toggleD=d=>setDiet(p=>p.includes(d)?p.filter(x=>x!==d):[...p,d]);
+  const toggleT=d=>{if(td.includes(d)){if(td.length>2)setTd(td.filter(x=>x!==d));}else if(td.length<6)setTd([...td,d].sort());};
+  const BG="linear-gradient(145deg,#0F1E4A,#1A56DB 55%,#059669)";
+  const W={width:"100%",maxWidth:380,color:"#fff"};
+  const Step=({n})=><div style={{fontSize:10,color:"rgba(255,255,255,.4)",letterSpacing:3,marginBottom:10,fontWeight:600}}>PASO {n} DE 3</div>;
+  const Ttl=({t})=><h2 style={{fontFamily:"'Syne',sans-serif",fontSize:30,margin:"0 0 6px",fontWeight:800}}>{t}</h2>;
+  const Sub=({t})=><p style={{fontSize:14,opacity:.6,margin:"0 0 24px"}}>{t}</p>;
+  const Btn=({onClick,disabled,children,style={}})=><button onClick={onClick} disabled={disabled} style={{width:"100%",padding:14,borderRadius:50,border:"none",fontSize:15,fontWeight:700,cursor:disabled?"not-allowed":"pointer",fontFamily:"'Syne',sans-serif",...style}}>{children}</button>;
+  const Back=({to})=><button onClick={()=>setStep(to)} style={{background:"none",border:"none",color:"rgba(255,255,255,.55)",fontSize:14,cursor:"pointer",padding:0,marginBottom:28}}>← Volver</button>;
+  const inp={width:"100%",padding:"14px 16px",borderRadius:14,border:"2px solid rgba(255,255,255,.15)",background:"rgba(255,255,255,.09)",color:"#fff",fontSize:15,boxSizing:"border-box",outline:"none",fontFamily:"'DM Sans',sans-serif"};
+  const wrap={minHeight:"100vh",background:BG,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:28,overflowY:"auto"};
+  const SelBtn=(active,onClick,children)=><button onClick={onClick} style={{padding:"12px 10px",borderRadius:14,border:`2px solid ${active?"#fff":"rgba(255,255,255,.15)"}`,background:active?"#fff":"rgba(255,255,255,.07)",color:active?"#0F1E4A":"rgba(255,255,255,.8)",fontWeight:active?700:400,cursor:"pointer",fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>{children}</button>;
+
+  if(step===0)return(
+    <div style={wrap}>
+      <div style={{textAlign:"center",color:"#fff",maxWidth:380,width:"100%"}}>
+        <div style={{fontSize:72,lineHeight:1,marginBottom:16}}>⚡</div>
+        <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:44,margin:"0 0 6px",fontWeight:800,letterSpacing:-1}}>Meirins</h1>
+        <p style={{fontSize:10,letterSpacing:4,opacity:.5,textTransform:"uppercase",margin:"0 0 28px"}}>CICLO · ENERGÍA · FUERZA</p>
+        {["🌙 Seguimiento de ciclo con predicciones","🥗 Nutrición adaptada a tu fase hormonal","💪 Entrenamientos según tu energía","📓 Diario de síntomas y bienestar","✨ Asistente IA personalizado"].map(f=>(
+          <div key={f} style={{background:"rgba(255,255,255,.08)",borderRadius:12,padding:"10px 14px",marginBottom:8,fontSize:13,textAlign:"left"}}>{f}</div>
+        ))}
+        <Btn onClick={()=>setStep(1)} style={{marginTop:20,background:"#fff",color:"#0F1E4A"}}>Comenzar →</Btn>
+      </div>
+    </div>
+  );
+
+  if(step===1)return(
+    <div style={wrap}><div style={W}>
+      <Back to={0}/>
+      <Step n="1"/>
+      <Ttl t="Tu ciclo"/><Sub t="Necesito esto para calcular tu fase actual"/>
+      <label style={{display:"block",fontSize:11,opacity:.7,marginBottom:8,fontWeight:600,letterSpacing:1}}>¿CUÁNDO EMPEZÓ TU ÚLTIMA REGLA?</label>
+      <input type="date" value={date} onChange={e=>setDate(e.target.value)} max={today} style={{...inp,marginBottom:28,colorScheme:"dark"}}/>
+      <label style={{display:"block",fontSize:11,opacity:.7,marginBottom:10,fontWeight:600,letterSpacing:1}}>DURACIÓN: <strong>{len} DÍAS</strong></label>
+      <input type="range" min={21} max={35} value={len} onChange={e=>setLen(+e.target.value)} style={{width:"100%",marginBottom:8,accentColor:"#34D399"}}/>
+      <div style={{display:"flex",justifyContent:"space-between",fontSize:11,opacity:.4,marginBottom:32}}><span>21d</span><span>28d (media)</span><span>35d</span></div>
+      <Btn onClick={()=>date&&setStep(2)} disabled={!date} style={{background:date?"#fff":"rgba(255,255,255,.2)",color:date?"#0F1E4A":"rgba(255,255,255,.35)"}}>Siguiente →</Btn>
+    </div></div>
+  );
+
+  if(step===2)return(
+    <div style={wrap}><div style={W}>
+      <Back to={1}/>
+      <Step n="2"/>
+      <Ttl t="Tus objetivos"/><Sub t="Selecciona todo lo que aplique"/>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
+        {GOAL_OPTS.map(g=>SelBtn(goals.includes(g.id),()=>toggleG(g.id),<><div style={{fontSize:22,marginBottom:4}}>{g.i}</div>{g.l}</>))}
+      </div>
+      <p style={{fontSize:11,opacity:.6,margin:"0 0 10px",fontWeight:600,letterSpacing:1}}>RESTRICCIONES DIETÉTICAS</p>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:28}}>
+        {DIET_OPTS.map(d=><button key={d.id} onClick={()=>toggleD(d.id)} style={{padding:"8px 14px",borderRadius:20,border:`2px solid ${diet.includes(d.id)?"#fff":"rgba(255,255,255,.15)"}`,background:diet.includes(d.id)?"rgba(255,255,255,.9)":"rgba(255,255,255,.07)",color:diet.includes(d.id)?"#0F1E4A":"rgba(255,255,255,.8)",fontWeight:diet.includes(d.id)?700:400,cursor:"pointer",fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>{d.i} {d.l}</button>)}
+      </div>
+      <Btn onClick={()=>setStep(3)} style={{background:"#fff",color:"#0F1E4A"}}>Siguiente →</Btn>
+    </div></div>
+  );
+
+  return(
+    <div style={wrap}><div style={W}>
+      <Back to={2}/>
+      <Step n="3"/>
+      <Ttl t="¿Cuándo entrenas?"/><Sub t="Mín. 2 días · Máx. 6 días"/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:5,marginBottom:24}}>
+        {[0,1,2,3,4,5,6].map(d=>{const a=td.includes(d);return(
+          <button key={d} onClick={()=>toggleT(d)} style={{padding:"12px 0",borderRadius:12,border:`2px solid ${a?"#fff":"rgba(255,255,255,.15)"}`,background:a?"#fff":"rgba(255,255,255,.07)",color:a?"#0F1E4A":"rgba(255,255,255,.65)",fontWeight:a?800:400,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+            <span style={{fontSize:10}}>{DAY_S[d]}</span>
+            <span style={{fontSize:16}}>{a?"💪":"😴"}</span>
+          </button>
+        );})}
+      </div>
+      <div style={{background:"rgba(255,255,255,.09)",borderRadius:14,padding:14,marginBottom:20,fontSize:13,lineHeight:1.9}}>
+        <strong>✨ Tu programa</strong><br/>
+        🎯 {goals.map(g=>GOAL_OPTS.find(o=>o.id===g)?.l).join(" · ")}<br/>
+        💪 {td.map(d=>DAY_L[d]).join(", ")}
+      </div>
+      <Btn onClick={()=>done(date,len,td,goals,diet)} style={{background:"#fff",color:"#0F1E4A"}}>Crear mi programa ⚡</Btn>
+    </div></div>
+  );
+}
+
+// ── Settings Panel ─────────────────────────────────────────────────────────
+function Settings({pi,goals,diet,td,lastPeriod,cycleLen,onClose,setLP,setCL,setGoals,setDiet,setTd,onReset}){
+  const [ed,setEd]=useState(null);
+  const [nd,setNd]=useState(lastPeriod);
+  const [nl,setNl]=useState(cycleLen);
+  const today=new Date().toISOString().split("T")[0];
+  const toggleG=g=>setGoals(p=>p.includes(g)?p.length>1?p.filter(x=>x!==g):p:[...p,g]);
+  const toggleD=d=>setDiet(p=>p.includes(d)?p.filter(x=>x!==d):[...p,d]);
+  const toggleT=d=>{if(td.includes(d)){if(td.length>2)setTd(td.filter(x=>x!==d));}else if(td.length<6)setTd([...td,d].sort());};
+  const BtnEdit=({id,label})=><button onClick={()=>setEd(ed===id?null:id)} style={{fontSize:12,color:C.blue,background:"none",border:"none",cursor:"pointer",fontWeight:600}}>{ed===id?"Listo":"Editar"}</button>;
+  const SRow=({label,children,id})=>(
+    <div style={{marginBottom:16}}>
+      <Row style={{justifyContent:"space-between",marginBottom:8}}>
+        <span style={{fontSize:13,fontWeight:700,color:C.text}}>{label}</span>
+        <BtnEdit id={id}/>
+      </Row>
+      {children}
+    </div>
+  );
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:500,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
+      <div onClick={onClose} style={{position:"absolute",inset:0,background:"rgba(15,30,74,.5)",backdropFilter:"blur(4px)"}}/>
+      <div style={{position:"relative",background:"#fff",borderRadius:"24px 24px 0 0",maxHeight:"88vh",overflowY:"auto",animation:"su .3s ease"}}>
+        <div style={{position:"sticky",top:0,background:"#fff",zIndex:10,padding:"20px 20px 0",borderBottom:`1px solid ${C.borderL}`,paddingBottom:16,marginBottom:16}}>
+          <Row style={{justifyContent:"space-between"}}>
+            <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:800,color:C.text}}>⚙️ Mi perfil</h2>
+            <button onClick={onClose} style={{width:32,height:32,borderRadius:16,border:"none",background:C.blueL,color:C.blue,fontSize:16,cursor:"pointer",fontWeight:700}}>×</button>
+          </Row>
+        </div>
+        <div style={{padding:"0 20px 32px"}}>
+          {/* Phase banner */}
+          <div style={{background:pi?.data?.gradient,borderRadius:16,padding:"14px 16px",marginBottom:20,color:"#fff"}}>
+            <div style={{fontSize:10,opacity:.7,fontWeight:700,letterSpacing:1,marginBottom:4}}>FASE ACTUAL</div>
+            <div style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:800}}>{pi?.data?.emoji} Fase {pi?.data?.name}</div>
+            <div style={{fontSize:12,opacity:.8,marginTop:2}}>Día {pi?.day} de {pi?.cycleLen} · {pi?.daysLeft} días restantes</div>
+            <div style={{fontSize:11,opacity:.65,marginTop:4}}>Próxima regla: {pi?.nextPeriod?.toLocaleDateString("es-ES",{day:"numeric",month:"long"})}</div>
+          </div>
+
+          {/* Cycle */}
+          <SRow label="🗓 Ciclo menstrual" id="ciclo">
+            {ed==="ciclo"?(
+              <div style={{background:C.blueL,borderRadius:14,padding:14}}>
+                <label style={{fontSize:11,color:C.text2,display:"block",marginBottom:4}}>Inicio última regla</label>
+                <input type="date" value={nd} onChange={e=>setNd(e.target.value)} max={today} style={{width:"100%",padding:"10px 12px",borderRadius:10,border:`1.5px solid ${C.border}`,fontSize:13,boxSizing:"border-box",marginBottom:12,outline:"none"}}/>
+                <label style={{fontSize:11,color:C.text2,display:"block",marginBottom:4}}>Duración: <strong>{nl} días</strong></label>
+                <input type="range" min={21} max={35} value={nl} onChange={e=>setNl(+e.target.value)} style={{width:"100%",marginBottom:12,accentColor:C.blue}}/>
+                <button onClick={()=>{if(nd){setLP(nd);setCL(nl);}setEd(null);}} style={{width:"100%",padding:9,borderRadius:10,border:"none",background:C.blue,color:"#fff",fontWeight:700,cursor:"pointer",fontSize:13}}>Guardar</button>
+              </div>
+            ):(
+              <Row style={{gap:16,background:"#F8FAFF",borderRadius:12,padding:"10px 14px"}}>
+                <div><div style={{fontSize:10,color:C.text3,marginBottom:2}}>ÚLTIMA REGLA</div><div style={{fontSize:13,fontWeight:600}}>{new Date(lastPeriod+"T12:00:00").toLocaleDateString("es-ES",{day:"numeric",month:"long"})}</div></div>
+                <div><div style={{fontSize:10,color:C.text3,marginBottom:2}}>CICLO</div><div style={{fontSize:13,fontWeight:600}}>{cycleLen} días</div></div>
+              </Row>
+            )}
+          </SRow>
+
+          {/* Goals */}
+          <SRow label="🎯 Objetivos" id="goals">
+            {ed==="goals"?(
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                {GOAL_OPTS.map(g=>{const a=goals.includes(g.id);return(<button key={g.id} onClick={()=>toggleG(g.id)} style={{padding:"10px",borderRadius:12,border:`2px solid ${a?C.blue:C.borderL}`,background:a?C.blueL:"#fff",cursor:"pointer",fontSize:12,color:a?C.blue:C.text2,fontWeight:a?700:400}}>{g.i} {g.l}</button>);})}
+              </div>
+            ):(
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {goals.map(g=>{const o=GOAL_OPTS.find(x=>x.id===g);return o?<Tag key={g} bg={C.blueL} col={C.blue}>{o.i} {o.l}</Tag>:null;})}
+              </div>
+            )}
+          </SRow>
+
+          {/* Diet */}
+          <SRow label="🥗 Dieta" id="diet">
+            {ed==="diet"?(
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {DIET_OPTS.map(d=>{const a=diet.includes(d.id);return(<button key={d.id} onClick={()=>toggleD(d.id)} style={{padding:"8px 14px",borderRadius:20,border:`2px solid ${a?C.green:C.borderL}`,background:a?C.greenL:"#fff",color:a?C.green:C.text2,fontWeight:a?700:400,cursor:"pointer",fontSize:12}}>{d.i} {d.l}</button>);})}
+              </div>
+            ):(
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {diet.length===0?<span style={{fontSize:12,color:C.text3}}>Sin restricciones</span>:diet.map(d=>{const o=DIET_OPTS.find(x=>x.id===d);return o?<Tag key={d} bg={C.greenL} col={C.green}>{o.i} {o.l}</Tag>:null;})}
+              </div>
+            )}
+          </SRow>
+
+          {/* Training days */}
+          <SRow label="💪 Días de entreno" id="train">
+            <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}>
+              {[0,1,2,3,4,5,6].map(d=>{const a=td.includes(d);return(
+                <div key={d} onClick={()=>ed==="train"&&toggleT(d)} style={{padding:"8px 0",borderRadius:10,background:a?C.blueL:C.bg,textAlign:"center",cursor:ed==="train"?"pointer":"default",border:a&&ed==="train"?`2px solid ${C.blue}`:"none"}}>
+                  <div style={{fontSize:10,color:a?C.blue:C.text3,fontWeight:a?700:400}}>{DAY_S[d]}</div>
+                  {ed==="train"&&<div style={{fontSize:12}}>{a?"✓":""}</div>}
+                </div>
+              );})}
+            </div>
+            {ed==="train"&&<div style={{fontSize:11,color:C.text3,marginTop:6,textAlign:"center"}}>Toca para activar/desactivar</div>}
+          </SRow>
+
+          <button onClick={()=>{if(window.confirm("¿Reiniciar toda la configuración?"))onReset();}} style={{width:"100%",padding:11,borderRadius:50,border:"2px solid #FEE2E2",background:"#FFF5F5",color:"#EF4444",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+            🗑 Reiniciar programa
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── HomeTab ────────────────────────────────────────────────────────────────
+function HomeTab({pi,goals,setTab}){
+  const d=pi?.data;
+  const todayW=d?.week[jsToIdx[new Date().getDay()]];
+  const GL={perder_peso:"Perder peso ⚖️",definir:"Definir 💪",bienestar:"Bienestar 🌿",rendimiento:"Rendimiento 🏆"};
+  const NavCard=({tab,accent,title,label,children})=>(
+    <div onClick={()=>setTab(tab)} style={{...card,cursor:"pointer",border:"2px solid transparent",position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",top:0,left:0,width:4,height:"100%",background:accent}}/>
+      <div style={{paddingLeft:8}}>
+        <div style={{fontSize:9,color:C.text3,fontWeight:700,letterSpacing:1,marginBottom:4}}>{label}</div>
+        <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:4}}>{title}</div>
+        {children}
+      </div>
+      <div style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",color:accent,fontSize:22,opacity:.4}}>›</div>
+    </div>
+  );
+  return(
+    <div>
+      {/* Phase hero */}
+      <div style={{background:d?.gradient,borderRadius:24,padding:"20px 18px",marginBottom:12,color:"#fff",boxShadow:`0 8px 32px ${d?.color}44`}}>
+        <div style={{fontSize:9,opacity:.6,fontWeight:700,letterSpacing:2,marginBottom:6}}>FASE ACTUAL</div>
+        <Row style={{justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+          <div>
+            <div style={{fontFamily:"'Syne',sans-serif",fontSize:26,fontWeight:800,lineHeight:1}}>{d?.emoji} {d?.name}</div>
+            <div style={{fontSize:12,opacity:.8,marginTop:4,fontStyle:"italic"}}>{d?.tagline}</div>
+          </div>
+          <div style={{background:"rgba(255,255,255,.18)",borderRadius:14,padding:"8px 14px",textAlign:"center",backdropFilter:"blur(8px)"}}>
+            <div style={{fontSize:28,fontWeight:800,lineHeight:1}}>{pi?.day}</div>
+            <div style={{fontSize:8,opacity:.7,marginTop:2,letterSpacing:1}}>DÍA</div>
+          </div>
+        </Row>
+        <div style={{height:5,background:"rgba(255,255,255,.15)",borderRadius:3,overflow:"hidden",marginBottom:10}}>
+          <div style={{height:"100%",width:`${((pi?.day-1)/(pi?.cycleLen||28))*100}%`,background:"rgba(255,255,255,.75)",borderRadius:3}}/>
+        </div>
+        <Row style={{justifyContent:"space-between"}}>
+          <span style={{fontSize:11,opacity:.85}}>Quedan <strong>{pi?.daysLeft} días</strong> en esta fase</span>
+          <span style={{fontSize:10,opacity:.6,background:"rgba(255,255,255,.12)",padding:"3px 8px",borderRadius:16}}>📅 Regla en {pi?.daysToNext}d</span>
+        </Row>
+      </div>
+
+      {/* Stats */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+        <Card style={{margin:0,padding:14}}>
+          <div style={{fontSize:9,color:C.text3,marginBottom:6,fontWeight:700,letterSpacing:1}}>INTENSIDAD HOY</div>
+          <div style={{fontSize:18,fontWeight:800,color:d?.color,marginBottom:6}}>{d?.intensity}</div>
+          <div style={{height:5,background:C.bg,borderRadius:3,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${d?.intensityPct}%`,background:d?.color,borderRadius:3}}/>
+          </div>
+        </Card>
+        <Card style={{margin:0,padding:14}}>
+          <div style={{fontSize:9,color:C.text3,marginBottom:6,fontWeight:700,letterSpacing:1}}>OBJETIVOS</div>
+          {goals.slice(0,2).map(g=><div key={g} style={{fontSize:11,color:C.text2,marginBottom:3}}>{GL[g]||g}</div>)}
+        </Card>
+      </div>
+
+      <div style={{fontSize:10,color:C.text3,fontWeight:700,letterSpacing:1,marginBottom:8}}>ACCESO RÁPIDO</div>
+
+      <NavCard tab="ciclo" accent={d?.color} label="CICLO HOY" title={`${d?.emoji} ${d?.tagline}`}>
+        <div style={{fontSize:11,color:C.text2}}>{d?.insights?.[0]}</div>
+      </NavCard>
+
+      <NavCard tab="nutri" accent={C.green} label="NUTRICIÓN HOY" title={`${d?.meals[0].ico} ${d?.meals[0].title}`}>
+        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+          {d?.focus.map(f=><Tag key={f} bg={C.greenL} col={C.green}>{f}</Tag>)}
+        </div>
+      </NavCard>
+
+      <NavCard tab="gym" accent={C.blue} label="ENTRENO HOY" title={`${todayW?.ico} ${todayW?.name}`}>
+        <div style={{fontSize:11,color:C.blue}}>{todayW?.dur}</div>
+      </NavCard>
+
+      <Card style={{background:d?.gradient,border:"none"}}>
+        <div style={{fontSize:9,color:"rgba(255,255,255,.6)",fontWeight:700,letterSpacing:2,marginBottom:8}}>💡 CONSEJO DE FASE</div>
+        <div style={{fontSize:14,color:"#fff",lineHeight:1.65,fontStyle:"italic"}}>"{d?.tip}"</div>
+      </Card>
+    </div>
+  );
+}
+
+// ── CicloTab ───────────────────────────────────────────────────────────────
+function CicloTab({pi,setLP,setCL,dailyLog,setDailyLog}){
+  const [sub,setSub]=useState("ciclo");
+  const d=pi?.data;
+  const today=new Date().toISOString().split("T")[0];
+  const todayLog=dailyLog[today]||{};
+  const now=new Date();
+  const yr=now.getFullYear(),mo=now.getMonth();
+  const dIM=new Date(yr,mo+1,0).getDate();
+  const sw=new Date(yr,mo,1).getDay();
+
+  function getDayPhase(dn){
+    if(!pi)return null;
+    const date=new Date(yr,mo,dn);
+    const s=new Date(pi.nextPeriod);s.setDate(s.getDate()-pi.cycleLen);
+    const diff=Math.round((date-s)/86400000);
+    const dc=((diff%pi.cycleLen)+pi.cycleLen)%pi.cycleLen+1;
+    if(dc<1||dc>pi.cycleLen)return null;
+    return dc<=5?"menstrual":dc<=13?"follicular":dc<=16?"ovulation":"luteal";
+  }
+
+  function saveLog(update){
+    const upd={...dailyLog,[today]:{...todayLog,...update}};
+    setDailyLog(upd);lsSet("meirins_diary",upd);
+  }
+
+  return(
+    <div>
+      <SubTabs tabs={[{id:"ciclo",l:"Ciclo"},{id:"calendario",l:"Calendario"},{id:"diario",l:"📓 Diario"}]} active={sub} set={setSub}/>
+
+      {sub==="ciclo"&&<div>
+        <Card style={{textAlign:"center",padding:"22px 16px"}}>
+          <svg width={200} height={200} viewBox="0 0 200 200" style={{display:"block",margin:"0 auto 12px"}}>
+            {[{ph:"menstrual",s:0,e:5/28},{ph:"follicular",s:5/28,e:13/28},{ph:"ovulation",s:13/28,e:16/28},{ph:"luteal",s:16/28,e:1}].map(({ph,s,e})=>{
+              const r=75,cx=100,cy=100,a1=s*2*Math.PI-Math.PI/2,a2=e*2*Math.PI-Math.PI/2;
+              const x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1),x2=cx+r*Math.cos(a2),y2=cy+r*Math.sin(a2);
+              return <path key={ph} d={`M${cx} ${cy}L${x1} ${y1}A${r} ${r} 0 ${(e-s)>.5?1:0} 1 ${x2} ${y2}Z`} fill={ph===pi?.phase?PH_DATA[ph].color:PH_DATA[ph].light} stroke="#fff" strokeWidth={2.5}/>;
+            })}
+            <circle cx={100} cy={100} r={55} fill="#fff"/>
+            {pi&&(()=>{const r=75,cx=100,cy=100,a=((pi.day-1)/pi.cycleLen)*2*Math.PI-Math.PI/2;return <circle cx={cx+r*Math.cos(a)} cy={cy+r*Math.sin(a)} r={9} fill={d?.color} stroke="#fff" strokeWidth={2.5}/>;})()}
+            <text x={100} y={95} textAnchor="middle" style={{fontSize:9,fill:C.text3}}>día del ciclo</text>
+            <text x={100} y={120} textAnchor="middle" style={{fontSize:34,fontWeight:800,fill:C.text}}>{pi?.day}</text>
+          </svg>
+          <div style={{fontFamily:"'Syne',sans-serif",fontSize:18,fontWeight:800,color:d?.color}}>{d?.emoji} Fase {d?.name}</div>
+          <div style={{fontSize:12,color:C.text2,marginTop:4}}>{d?.tagline} · {pi?.daysLeft} días restantes</div>
+          <div style={{marginTop:10,background:d?.light,borderRadius:10,padding:"7px 14px",display:"inline-block",fontSize:12}}>
+            <span style={{color:d?.color,fontWeight:700}}>📅 Próxima regla: </span>
+            <span style={{color:C.text2}}>{pi?.nextPeriod?.toLocaleDateString("es-ES",{day:"numeric",month:"long"})} ({pi?.daysToNext}d)</span>
+          </div>
+        </Card>
+
+        {Object.entries(PH_DATA).map(([key,ph])=>{
+          const isA=key===pi?.phase;
+          const pD={menstrual:"Días 1–5",follicular:"Días 6–13",ovulation:"Días 14–16",luteal:`Días 17–${pi?.cycleLen||28}`};
+          return(
+            <Card key={key} style={{border:isA?`2px solid ${ph.color}`:`1px solid ${C.borderL}`,padding:"14px 16px"}}>
+              <Row style={{justifyContent:"space-between"}}>
+                <div><span style={{fontFamily:"'Syne',sans-serif",fontSize:15,fontWeight:700,color:isA?ph.color:C.text}}>{ph.emoji} {ph.name}</span><span style={{fontSize:11,color:C.text3,marginLeft:8}}>{pD[key]}</span></div>
+                {isA&&<span style={{background:ph.color,color:"#fff",fontSize:9,padding:"4px 10px",borderRadius:20,fontWeight:800}}>HOY</span>}
+              </Row>
+              {isA&&<div style={{fontSize:12,color:C.text2,marginTop:10,lineHeight:1.7}}>{ph.desc}</div>}
+            </Card>
+          );
+        })}
+
+        <Card style={{border:`2px dashed ${C.borderL}`}}>
+          <EditCycle pi={pi} setLP={setLP} setCL={setCL}/>
+        </Card>
+      </div>}
+
+      {sub==="calendario"&&<div>
+        <Card>
+          <div style={{fontFamily:"'Syne',sans-serif",fontSize:15,fontWeight:800,color:C.text,marginBottom:14,textTransform:"capitalize"}}>
+            {new Date(yr,mo).toLocaleDateString("es-ES",{month:"long",year:"numeric"})}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:6}}>
+            {["D","L","M","X","J","V","S"].map(d=><div key={d} style={{textAlign:"center",fontSize:9,color:C.text3,fontWeight:700,padding:"4px 0"}}>{d}</div>)}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
+            {Array.from({length:sw},(_,i)=><div key={"e"+i}/>)}
+            {Array.from({length:dIM},(_,i)=>{
+              const dn=i+1;const ph=getDayPhase(dn);const isT=dn===now.getDate();
+              const ds=`${yr}-${String(mo+1).padStart(2,"0")}-${String(dn).padStart(2,"0")}`;
+              const lg=dailyLog[ds];
+              return(
+                <div key={dn} style={{aspectRatio:"1",borderRadius:9,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:isT?(ph?PH_DATA[ph].color:C.blue):ph?PH_DATA[ph].light:C.bg,position:"relative"}}>
+                  <span style={{fontSize:12,fontWeight:isT?800:500,color:isT?"#fff":ph?PH_DATA[ph].color:C.text3}}>{dn}</span>
+                  {lg?.flow>0&&<div style={{position:"absolute",bottom:2,width:4,height:4,borderRadius:2,background:isT?"rgba(255,255,255,.8)":"#DC2626"}}/>}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:12}}>
+            {Object.entries(PH_DATA).map(([k,ph])=>(
+              <span key={k} style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:ph.color,fontWeight:600}}>
+                <div style={{width:8,height:8,borderRadius:4,background:ph.color}}/>{ph.name}
+              </span>
+            ))}
+          </div>
+        </Card>
+      </div>}
+
+      {sub==="diario"&&<div>
+        <Card style={{background:C.blueL,border:`1.5px solid ${C.blue}22`}}>
+          <div style={{fontSize:10,color:C.blue,fontWeight:800,letterSpacing:1,marginBottom:4}}>HOY · {new Date().toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})}</div>
+          <div style={{fontSize:12,color:C.text2}}>Día {pi?.day} · Fase {d?.name}</div>
+        </Card>
+
+        <Card>
+          <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:12}}>😊 ¿Cómo te encuentras?</div>
+          <Row style={{justifyContent:"space-between",gap:4}}>
+            {MOODS.map(m=>(
+              <button key={m.id} onClick={()=>saveLog({mood:todayLog.mood===m.id?null:m.id})}
+                style={{flex:1,padding:"10px 4px",borderRadius:12,border:`2px solid ${todayLog.mood===m.id?C.blue:C.borderL}`,background:todayLog.mood===m.id?C.blueL:"#fff",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                <span style={{fontSize:22}}>{m.i}</span>
+                <span style={{fontSize:9,color:todayLog.mood===m.id?C.blue:C.text3,fontWeight:todayLog.mood===m.id?700:400}}>{m.l}</span>
+              </button>
+            ))}
+          </Row>
+        </Card>
+
+        <Card>
+          <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:12}}>🩸 Flujo menstrual</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {FLOW.map(f=>(
+              <button key={f.id} onClick={()=>saveLog({flow:todayLog.flow===f.id?undefined:f.id})}
+                style={{padding:"8px 12px",borderRadius:20,border:`2px solid ${todayLog.flow===f.id?"#EF4444":C.borderL}`,background:todayLog.flow===f.id?"#FEF2F2":"#fff",cursor:"pointer",fontSize:12,color:todayLog.flow===f.id?"#EF4444":C.text2,fontWeight:todayLog.flow===f.id?700:400}}>
+                {f.l}
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        <Card>
+          <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:12}}>🩺 Síntomas</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+            {SYMPTOMS.map(s=>{const a=(todayLog.symptoms||[]).includes(s.id);return(
+              <button key={s.id} onClick={()=>{const c=todayLog.symptoms||[];saveLog({symptoms:a?c.filter(x=>x!==s.id):[...c,s.id]});}}
+                style={{padding:"10px 8px",borderRadius:12,border:`2px solid ${a?C.blue:C.borderL}`,background:a?C.blueL:"#fff",cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+                <span style={{fontSize:18}}>{s.i}</span>
+                <span style={{fontSize:12,color:a?C.blue:C.text2,fontWeight:a?700:400}}>{s.l}</span>
+              </button>
+            );})}
+          </div>
+        </Card>
+
+        <Card>
+          <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:8}}>⚡ Energía ({todayLog.energy||3}/5)</div>
+          <input type="range" min={1} max={5} value={todayLog.energy||3} onChange={e=>saveLog({energy:+e.target.value})} style={{width:"100%",marginBottom:4,accentColor:C.blue}}/>
+          <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:8,marginTop:12}}>😴 Sueño ({todayLog.sleep||3}/5)</div>
+          <input type="range" min={1} max={5} value={todayLog.sleep||3} onChange={e=>saveLog({sleep:+e.target.value})} style={{width:"100%",accentColor:C.teal}}/>
+        </Card>
+
+        <Card>
+          <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>📝 Notas del día</div>
+          <textarea value={todayLog.notes||""} onChange={e=>saveLog({notes:e.target.value})} placeholder="¿Cómo te has sentido hoy? Notas del entreno, comida, emociones..."
+            style={{width:"100%",minHeight:80,padding:"10px 12px",borderRadius:12,border:`2px solid ${C.borderL}`,fontSize:13,resize:"none",outline:"none",color:C.text2,lineHeight:1.6}}/>
+        </Card>
+      </div>}
+    </div>
+  );
+}
+
+function EditCycle({pi,setLP,setCL}){
+  const [ed,setEd]=useState(false);
+  const [d,setD]=useState("");
+  const [l,setL]=useState(pi?.cycleLen||28);
+  const today=new Date().toISOString().split("T")[0];
+  if(!ed)return <button onClick={()=>setEd(true)} style={{width:"100%",background:"none",border:"none",fontSize:13,color:C.text2,cursor:"pointer",padding:4}}>✏️ Actualizar fecha o duración del ciclo</button>;
+  return(
+    <div>
+      <div style={{fontSize:13,fontWeight:700,marginBottom:12,color:C.text}}>Actualizar ciclo</div>
+      <label style={{fontSize:11,color:C.text2,display:"block",marginBottom:4}}>Inicio última regla</label>
+      <input type="date" value={d} onChange={e=>setD(e.target.value)} max={today} style={{width:"100%",padding:"10px 12px",borderRadius:10,border:`1.5px solid ${C.border}`,fontSize:14,boxSizing:"border-box",marginBottom:12,outline:"none"}}/>
+      <label style={{fontSize:11,color:C.text2,display:"block",marginBottom:4}}>Duración: <strong>{l} días</strong></label>
+      <input type="range" min={21} max={35} value={l} onChange={e=>setL(+e.target.value)} style={{width:"100%",marginBottom:14,accentColor:C.blue}}/>
+      <Row style={{gap:8}}>
+        <button onClick={()=>setEd(false)} style={{flex:1,padding:10,borderRadius:10,border:`1px solid ${C.borderL}`,background:"#fff",cursor:"pointer",fontSize:14}}>Cancelar</button>
+        <button onClick={()=>{if(d){setLP(d);setCL(l);}setEd(false);}} style={{flex:1,padding:10,borderRadius:10,border:"none",background:C.blue,color:"#fff",fontWeight:700,cursor:"pointer",fontSize:14}}>Guardar</button>
+      </Row>
+    </div>
+  );
+}
+
+// ── NutriTab ───────────────────────────────────────────────────────────────
+function NutriTab({d,pi,dailyLog,setDailyLog}){
+  const [sub,setSub]=useState("hoy");
+  const [adults,setAdults]=useState(1);
+  const [children,setChildren]=useState(0);
+  const [openM,setOpenM]=useState(null);
+  const [openD,setOpenD]=useState(null);
+  const [recipe,setRecipe]=useState(null);
+  const [checked,setChecked]=useState({});
+  const [dl,setDl]=useState(false);
+  const today=new Date().toISOString().split("T")[0];
+  const todayLog=dailyLog[today]||{};
+  const water=todayLog.water||0;
+  const WG=8;
+
+  function saveW(n){const upd={...dailyLog,[today]:{...todayLog,water:Math.max(0,Math.min(WG,n))}}; setDailyLog(upd);lsSet("meirins_diary",upd);}
+
+  const wDays=useMemo(()=>{
+    if(!pi)return[];
+    const ns=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+    return Array.from({length:7},(_,i)=>{
+      const date=new Date();date.setDate(date.getDate()+i);
+      const cd=((pi.day-1+i)%pi.cycleLen)+1;
+      const ph=cd<=5?"menstrual":cd<=13?"follicular":cd<=16?"ovulation":"luteal";
+      return{date,lbl:i===0?"Hoy":i===1?"Mañana":ns[date.getDay()],num:date.getDate(),ph,pd:PH_DATA[ph]};
+    });
+  },[pi]);
+
+  const shop=useMemo(()=>buildShop(wDays,adults,children),[wDays,adults,children]);
+  const total=adults+children;
+
+  function dlList(){let t=`LISTA DE LA COMPRA — MEIRINS\n${"─".repeat(40)}\n\n`;Object.entries(shop).forEach(([c,its])=>{t+=`${c}\n`;its.forEach(it=>{t+=`  □ ${it.name.padEnd(28)}${fmtQty(it.qty,it.unit)}\n`;});t+="\n";});const b=new Blob([t],{type:"text/plain;charset=utf-8"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download="meirins-compra.txt";a.click();URL.revokeObjectURL(u);setDl(true);setTimeout(()=>setDl(false),3e3);}
+
+  if(recipe)return(
+    <div>
+      <button onClick={()=>setRecipe(null)} style={{display:"flex",alignItems:"center",gap:8,background:"none",border:"none",fontSize:13,color:C.blue,cursor:"pointer",marginBottom:16,fontWeight:700,padding:0}}>← Volver al menú</button>
+      <Card style={{background:C.blueL,border:`1px solid ${C.blue}22`}}>
+        <div style={{fontSize:10,color:C.blue,fontWeight:800,letterSpacing:1,marginBottom:4}}>{recipe.meal}</div>
+        <div style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:800,color:C.text}}>{recipe.title}</div>
+      </Card>
+      <Card><div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:12}}>🛒 Ingredientes</div>
+        {recipe.ingredients.map((ing,i)=><div key={i} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${C.bg}`,fontSize:13,color:C.text2}}><div style={{width:5,height:5,borderRadius:3,background:C.blue,flexShrink:0}}/>{ing}</div>)}
+      </Card>
+      <Card><div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:12}}>👩‍🍳 Preparación</div>
+        {recipe.steps.map((s,i)=>(
+          <div key={i} style={{display:"flex",gap:12,padding:"10px 0",borderBottom:`1px solid ${C.bg}`}}>
+            <div style={{width:26,height:26,borderRadius:13,background:C.blue,color:"#fff",fontSize:11,fontWeight:800,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>{i+1}</div>
+            <div style={{fontSize:13,color:C.text2,lineHeight:1.65,paddingTop:4}}>{s}</div>
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+
+  const PeopleBtn=({val,set,min,max,col})=>(
+    <Row style={{justifyContent:"center",gap:8}}>
+      <button onClick={()=>set(v=>Math.max(min,v-1))} style={{width:28,height:28,borderRadius:14,border:`2px solid ${col}`,background:"#fff",color:col,fontSize:16,cursor:"pointer",fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+      <span style={{fontSize:20,fontWeight:800,color:col,minWidth:20,textAlign:"center"}}>{val}</span>
+      <button onClick={()=>set(v=>Math.min(max,v+1))} style={{width:28,height:28,borderRadius:14,border:"none",background:col,color:"#fff",fontSize:16,cursor:"pointer",fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+    </Row>
+  );
+
+  return(
+    <div>
+      <Card style={{padding:"14px 16px"}}>
+        <div style={{fontSize:12,fontWeight:700,marginBottom:10,color:C.text}}>👨‍👩‍👧 Personas en el hogar</div>
+        <Row style={{gap:10}}>
+          {[{l:"👤 Adultos",v:adults,s:setAdults,min:1,max:8,c:C.blue},{l:"🧒 Niños",v:children,s:setChildren,min:0,max:6,c:C.teal}].map(({l,v,s,min,max,c})=>(
+            <div key={l} style={{flex:1,background:C.bg,borderRadius:12,padding:10,textAlign:"center"}}>
+              <div style={{fontSize:10,color:C.text3,marginBottom:6,fontWeight:600}}>{l}</div>
+              <PeopleBtn val={v} set={s} min={min} max={max} col={c}/>
+            </div>
+          ))}
+        </Row>
+      </Card>
+
+      <SubTabs tabs={[{id:"hoy",l:"Hoy"},{id:"semana",l:"Semana"},{id:"agua",l:"💧 Agua"},{id:"lista",l:"🛒 Lista"}]} active={sub} set={setSub}/>
+
+      {sub==="hoy"&&<div>
+        <Card style={{background:d?.light,border:`1.5px solid ${d?.color}22`}}>
+          <div style={{fontSize:12,fontWeight:800,color:d?.color,marginBottom:8}}>📊 Fase {d?.name}</div>
+          <div style={{fontSize:12,color:C.text2,marginBottom:10}}>{d?.kcal}</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {d?.focus.map(f=><Tag key={f} bg={d?.color} col="#fff">{f}</Tag>)}
+          </div>
+        </Card>
+        {d?.meals.map((m,i)=>(
+          <Card key={m.t}>
+            <Row style={{justifyContent:"space-between",cursor:"pointer"}} onClick={()=>setOpenM(openM===i?null:i)}>
+              <Row style={{gap:12}}>
+                <div style={{width:44,height:44,borderRadius:12,background:C.blueL,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>{m.ico}</div>
+                <div>
+                  <div style={{fontSize:9,color:C.blue,fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:2}}>{m.t}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:C.text}}>{m.title}</div>
+                </div>
+              </Row>
+              <Chevron open={openM===i}/>
+            </Row>
+            {openM===i&&<div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.borderL}`}}>
+              {m.items.map(it=><div key={it} style={{display:"flex",gap:10,alignItems:"center",padding:"6px 0",fontSize:13,color:C.text2,borderBottom:`1px solid ${C.bg}`}}><div style={{width:5,height:5,borderRadius:3,background:C.blue,flexShrink:0}}/>{it}</div>)}
+              {m.recipe&&<button onClick={()=>setRecipe({meal:m.t,title:m.title,...m.recipe})} style={{marginTop:12,width:"100%",padding:10,borderRadius:12,border:`2px solid ${C.blue}`,background:C.blueL,color:C.blue,fontWeight:700,cursor:"pointer",fontSize:13}}>👩‍🍳 Ver receta completa</button>}
+            </div>}
+          </Card>
+        ))}
+      </div>}
+
+      {sub==="semana"&&<div>
+        <div style={{fontSize:11,color:C.text3,marginBottom:10}}>Próximos 7 días · {total} persona{total>1?"s":""}</div>
+        {wDays.map((day,i)=>(
+          <Card key={i} style={{padding:0,overflow:"hidden",border:i===0?`2px solid ${C.blue}`:`1px solid ${C.borderL}`,cursor:"pointer"}} onClick={()=>setOpenD(openD===i?null:i)}>
+            {/* Header */}
+            <Row style={{gap:12,padding:"12px 14px"}}>
+              <div style={{width:46,flexShrink:0,textAlign:"center"}}>
+                <div style={{fontSize:10,color:i===0?C.blue:C.text3,fontWeight:i===0?800:400}}>{day.lbl}</div>
+                <div style={{fontSize:22,fontWeight:800,color:C.text,lineHeight:1.1}}>{day.num}</div>
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <Tag bg={day.pd.color} col="#fff">{day.pd.emoji} {day.pd.name}</Tag>
+                <div style={{fontSize:11,color:C.text2,marginTop:4}}>{day.pd.meals.map(m=>`${m.ico} ${m.t}`).join("  ")}</div>
+              </div>
+              <Chevron open={openD===i}/>
+            </Row>
+            {/* Expanded */}
+            {openD===i&&(
+              <div style={{borderTop:`2px solid ${C.borderL}`,background:C.bg}}>
+                {day.pd.meals.map((meal,mi)=>(
+                  <div key={meal.t} style={{padding:"12px 14px",borderBottom:mi<day.pd.meals.length-1?`1px solid ${C.borderL}`:"none"}}>
+                    <Row style={{gap:8,marginBottom:8}}>
+                      <div style={{width:34,height:34,borderRadius:10,background:day.pd.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{meal.ico}</div>
+                      <div>
+                        <div style={{fontSize:9,color:day.pd.color,fontWeight:800,textTransform:"uppercase",letterSpacing:1}}>{meal.t}</div>
+                        <div style={{fontSize:13,fontWeight:700,color:C.text}}>{meal.title}</div>
+                      </div>
+                    </Row>
+                    <div style={{background:"#fff",borderRadius:10,padding:"8px 10px",marginBottom:8}}>
+                      {meal.items.map(it=>(
+                        <div key={it} style={{display:"flex",gap:8,alignItems:"center",fontSize:12,color:C.text2,padding:"4px 0",borderBottom:`1px solid ${C.bg}`}}>
+                          <div style={{width:4,height:4,borderRadius:2,background:day.pd.color,flexShrink:0}}/>{it}
+                        </div>
+                      ))}
+                    </div>
+                    {meal.recipe&&<button onClick={e=>{e.stopPropagation();setRecipe({meal:meal.t,title:meal.title,...meal.recipe});}} style={{padding:"7px 14px",borderRadius:10,border:`2px solid ${day.pd.color}`,background:day.pd.light,color:day.pd.color,fontWeight:700,cursor:"pointer",fontSize:12}}>👩‍🍳 Ver receta</button>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        ))}
+      </div>}
+
+      {sub==="agua"&&<div>
+        <div style={{background:`linear-gradient(135deg,#0C4A6E,#0891B2)`,borderRadius:20,padding:"28px 18px",marginBottom:12,color:"#fff",textAlign:"center"}}>
+          <div style={{fontSize:9,opacity:.65,fontWeight:700,letterSpacing:2,marginBottom:8}}>AGUA DEL DÍA</div>
+          <div style={{fontFamily:"'Syne',sans-serif",fontSize:60,fontWeight:800,lineHeight:1}}>{water}</div>
+          <div style={{fontSize:16,opacity:.75,marginBottom:4}}>/ {WG} vasos · {water*250}ml</div>
+          <div style={{height:7,background:"rgba(255,255,255,.2)",borderRadius:4,margin:"14px 0 10px",overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${(water/WG)*100}%`,background:"#fff",borderRadius:4,transition:"width .3s"}}/>
+          </div>
+          <div style={{fontSize:12,opacity:.65}}>{water>=WG?"🎉 ¡Meta alcanzada!":water>=WG/2?"¡Vas muy bien! 💪":"Sigue hidratándote 💧"}</div>
+        </div>
+        <Card>
+          <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:14}}>💧 Registra tus vasos</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16}}>
+            {Array.from({length:WG},(_,i)=>{const f=i<water;return(
+              <button key={i} onClick={()=>saveW(f?i:i+1)} style={{aspectRatio:".85",borderRadius:14,border:`2px solid ${f?C.cyan:C.borderL}`,background:f?C.cyanL:"#fff",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4}}>
+                <span style={{fontSize:24}}>{f?"🫙":"⬜"}</span>
+                <span style={{fontSize:9,color:f?C.cyan:C.text3,fontWeight:f?700:400}}>{i+1}</span>
+              </button>
+            );})}
+          </div>
+          <Row style={{gap:8}}>
+            <button onClick={()=>saveW(water-1)} disabled={water<=0} style={{flex:1,padding:11,borderRadius:12,border:`2px solid ${C.borderL}`,background:"#fff",color:C.text2,fontWeight:700,cursor:water>0?"pointer":"not-allowed",fontSize:14,opacity:water<=0?.4:1}}>− Quitar</button>
+            <button onClick={()=>saveW(water+1)} disabled={water>=WG} style={{flex:1,padding:11,borderRadius:12,border:"none",background:C.cyan,color:"#fff",fontWeight:700,cursor:water<WG?"pointer":"not-allowed",fontSize:14,opacity:water>=WG?.6:1}}>+ Añadir</button>
+          </Row>
+        </Card>
+        <Card style={{background:C.cyanL,border:`1.5px solid ${C.cyan}22`}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.cyan,marginBottom:8}}>💡 Hidratación en fase {d?.name}</div>
+          <div style={{fontSize:12,color:C.text2,lineHeight:1.7}}>
+            {{menstrual:"Durante la menstruación pierdes líquidos. Hidratarse bien reduce calambres y la fatiga.",follicular:"Los estrógenos en alza mejoran tu hidratación. Buen momento para aumentar el agua.",ovulation:"Tu metabolismo está al máximo. Bebe agua antes y después del ejercicio intenso.",luteal:"La progesterona eleva tu temperatura. Tu cuerpo necesita más agua en esta fase."}[pi?.phase]}
+          </div>
+        </Card>
+      </div>}
+
+      {sub==="lista"&&<div>
+        <Card style={{background:C.greenL,border:`1.5px solid ${C.green}22`}}>
+          <div style={{fontSize:13,fontWeight:800,color:C.green,marginBottom:6}}>🛒 Lista de la compra semanal</div>
+          <div style={{fontSize:12,color:C.text2}}><strong>{adults} adulto{adults>1?"s":""}</strong>{children>0&&<> + <strong>{children} niño{children>1?"s":""}</strong></>} · 7 días</div>
+        </Card>
+        {Object.entries(shop).map(([cat,items])=>(
+          <Card key={cat} style={{padding:"14px 16px"}}>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:C.text}}>{cat}</div>
+            {items.map(it=>{const k=it.name;return(
+              <Row key={k} style={{justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${C.bg}`}}>
+                <Row style={{gap:10}}>
+                  <div onClick={()=>setChecked(ch=>({...ch,[k]:!ch[k]}))} style={{width:20,height:20,borderRadius:6,border:`2px solid ${checked[k]?C.green:C.border}`,background:checked[k]?C.green:"#fff",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    {checked[k]&&<span style={{color:"#fff",fontSize:11,fontWeight:800}}>✓</span>}
+                  </div>
+                  <span style={{fontSize:13,color:checked[k]?C.text3:C.text,textDecoration:checked[k]?"line-through":"none"}}>{it.name}</span>
+                </Row>
+                <span style={{fontSize:13,fontWeight:700,color:C.green,flexShrink:0,marginLeft:8}}>{fmtQty(it.qty,it.unit)}</span>
+              </Row>
+            );})}
+          </Card>
+        ))}
+        <button onClick={dlList} style={{width:"100%",padding:14,borderRadius:50,border:"none",background:dl?"#059669":C.green,color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",transition:"all .3s",marginTop:4}}>
+          {dl?"✓ ¡Descargado!":"⬇ Descargar lista (.txt)"}
+        </button>
+      </div>}
+    </div>
+  );
+}
+
+// ── EntrenoTab ─────────────────────────────────────────────────────────────
+function EntrenoTab({d,pi,trainDays,wLog,setWLog}){
+  const [sub,setSub]=useState("hoy");
+  const [extra,setExtra]=useState("");
+  const [adding,setAdding]=useState(false);
+  const [expDay,setExpDay]=useState(null);
+  const todayJS=new Date();
+  const todayKey=todayJS.toISOString().split("T")[0];
+  const todayDow=todayJS.getDay();
+  const isTrain=trainDays.includes(todayDow);
+  const todayW=d?.week[jsToIdx[todayDow]];
+  const todayLog=wLog[todayKey];
+
+  function saveLog(u){const up={...wLog,[todayKey]:u};setWLog(up);lsSet("meirins_gym",up);}
+
+  const wDays=Array.from({length:7},(_,i)=>{
+    const date=new Date();date.setDate(date.getDate()+i);
+    const dow=date.getDay();const wIdx=jsToIdx[dow];
+    const cd=((pi.day-1+i)%pi.cycleLen)+1;const ph=cd<=5?"menstrual":cd<=13?"follicular":cd<=16?"ovulation":"luteal";
+    const dk=date.toISOString().split("T")[0];
+    return{date,dow,isTrain:trainDays.includes(dow),wIdx,ph,pd:PH_DATA[ph],log:wLog[dk],dk,num:date.getDate(),lbl:i===0?"Hoy":i===1?"Mañana":DAY_L[dow]};
+  });
+
+  const ExtraSection=()=>(
+    <Card>
+      <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>➕ {isTrain?"Actividad extra":"¿Has hecho algo? Regístralo"}</div>
+      {todayLog?.extraSport?(
+        <Row style={{justifyContent:"space-between",padding:"10px 12px",background:"#F0FDF4",borderRadius:10}}>
+          <span style={{fontSize:13,color:"#166534",fontWeight:600}}>🏅 {todayLog.extraSport}</span>
+          <button onClick={()=>saveLog({...todayLog,extraSport:""})} style={{background:"none",border:"none",color:C.text3,cursor:"pointer",fontSize:18}}>×</button>
+        </Row>
+      ):adding?(
+        <Row style={{gap:8}}>
+          <input value={extra} onChange={e=>setExtra(e.target.value)} placeholder="Ej: Tenis 1h, Pádel 90min..." style={{flex:1,padding:"10px 12px",borderRadius:10,border:`2px solid ${C.borderL}`,fontSize:13,outline:"none"}}/>
+          <button onClick={()=>{saveLog({...(todayLog||{status:"done"}),extraSport:extra});setAdding(false);setExtra("");}} style={{padding:"10px 16px",borderRadius:10,border:"none",background:C.blue,color:"#fff",fontWeight:700,cursor:"pointer",fontSize:13}}>+</button>
+        </Row>
+      ):(
+        <button onClick={()=>setAdding(true)} style={{width:"100%",padding:10,borderRadius:12,border:`2px dashed ${C.border}`,background:"#fff",color:C.text2,cursor:"pointer",fontSize:13}}>+ Añadir deporte o actividad</button>
+      )}
+    </Card>
+  );
+
+  return(
+    <div>
+      <SubTabs tabs={[{id:"hoy",l:"Hoy"},{id:"semana",l:"Semana"}]} active={sub} set={setSub}/>
+
+      {sub==="hoy"&&<div>
+        <Card style={{background:d?.light,border:`1.5px solid ${d?.color}22`}}>
+          <Row style={{justifyContent:"space-between",marginBottom:8}}>
+            <div style={{fontSize:12,fontWeight:800,color:d?.color}}>⚡ Fase {d?.name} · {d?.intensity}</div>
+          </Row>
+          <div style={{height:6,background:"rgba(0,0,0,.07)",borderRadius:3,marginBottom:8,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${d?.intensityPct}%`,background:d?.color,borderRadius:3}}/>
+          </div>
+          <div style={{fontSize:12,color:C.text2,fontStyle:"italic",lineHeight:1.6}}>{d?.tip}</div>
+        </Card>
+
+        {isTrain?(
+          <div>
+            <Card>
+              <Row style={{justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+                <div>
+                  <div style={{fontSize:9,color:C.blue,fontWeight:800,letterSpacing:1.5,marginBottom:6}}>SESIÓN DE HOY</div>
+                  <div style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:800,color:C.text}}>{todayW?.ico} {todayW?.name}</div>
+                  {todayW?.dur&&<div style={{fontSize:12,color:C.text2,marginTop:4}}>⏱ {todayW.dur}</div>}
+                </div>
+                {todayLog&&<span style={{padding:"6px 14px",borderRadius:20,fontSize:12,fontWeight:800,background:todayLog.status==="done"?"#DCFCE7":"#FEE2E2",color:todayLog.status==="done"?"#16A34A":"#DC2626",flexShrink:0}}>{todayLog.status==="done"?"✓ Hecho":"✗ Saltado"}</span>}
+              </Row>
+              {todayW?.exercises?.length>0&&<div style={{marginBottom:14}}>
+                {todayW.exercises.map((ex,i)=>(
+                  <Row key={i} style={{justifyContent:"space-between",padding:"10px 12px",borderRadius:12,background:i%2===0?C.bg:"#fff",marginBottom:4}}>
+                    <Row style={{gap:10}}>
+                      <div style={{width:24,height:24,borderRadius:12,background:C.blueL,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:C.blue,flexShrink:0}}>{i+1}</div>
+                      <span style={{fontSize:13,fontWeight:500,color:C.text}}>{ex.name}</span>
+                    </Row>
+                    <span style={{fontSize:12,color:C.blue,fontWeight:700,flexShrink:0,marginLeft:8}}>{ex.sets&&ex.reps?`${ex.sets}×${ex.reps}`:ex.sets&&ex.dur?`${ex.sets}×${ex.dur}`:ex.dur||""}</span>
+                  </Row>
+                ))}
+              </div>}
+              {!todayLog&&<Row style={{gap:8}}>
+                <button onClick={()=>saveLog({status:"done",extraSport:""})} style={{flex:1,padding:12,borderRadius:12,border:"none",background:"#16A34A",color:"#fff",fontWeight:800,cursor:"pointer",fontSize:14}}>✓ Completada</button>
+                <button onClick={()=>saveLog({status:"skipped",extraSport:""})} style={{flex:1,padding:12,borderRadius:12,border:"none",background:"#EF4444",color:"#fff",fontWeight:800,cursor:"pointer",fontSize:14}}>✗ No pude</button>
+              </Row>}
+              {todayLog&&<button onClick={()=>{const u={...wLog};delete u[todayKey];setWLog(u);lsSet("meirins_gym",u);}} style={{width:"100%",padding:9,borderRadius:12,border:`2px solid ${C.borderL}`,background:"#fff",color:C.text2,cursor:"pointer",fontSize:13,marginTop:8}}>Deshacer registro</button>}
+            </Card>
+            <ExtraSection/>
+          </div>
+        ):(
+          <div>
+            <Card style={{textAlign:"center",padding:28}}>
+              <div style={{fontSize:52,marginBottom:12}}>😴</div>
+              <div style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:800,color:C.text,marginBottom:8}}>Día de descanso</div>
+              <div style={{fontSize:13,color:C.text2,lineHeight:1.65}}>El descanso es parte esencial del progreso.</div>
+            </Card>
+            <ExtraSection/>
+          </div>
+        )}
+      </div>}
+
+      {sub==="semana"&&<div>
+        <Card>
+          <div style={{fontFamily:"'Syne',sans-serif",fontSize:14,fontWeight:800,marginBottom:14,color:C.text}}>📅 Tu semana</div>
+          {wDays.map((day,i)=>{
+            const w=d?.week[day.wIdx];const st=day.log?.status;const exp=expDay===i;
+            return(
+              <div key={i} style={{borderRadius:14,background:i===0?C.blueL:day.isTrain?C.bg:"#fff",border:`2px solid ${i===0?C.blue:C.borderL}`,marginBottom:8,overflow:"hidden"}}>
+                <Row style={{gap:10,padding:"12px 14px",cursor:"pointer"}} onClick={()=>setExpDay(exp?null:i)}>
+                  <div style={{width:40,textAlign:"center",flexShrink:0}}>
+                    <div style={{fontSize:10,color:i===0?C.blue:C.text3,fontWeight:i===0?800:400}}>{day.lbl}</div>
+                    <div style={{fontSize:18,fontWeight:800,color:C.text,lineHeight:1}}>{day.num}</div>
+                  </div>
+                  <span style={{fontSize:20,flexShrink:0}}>{day.isTrain?w?.ico:"😴"}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:day.isTrain?700:400,color:day.isTrain?C.text:C.text3}}>{day.isTrain?w?.name:"Descanso"}</div>
+                    {day.isTrain&&w?.dur&&<div style={{fontSize:10,color:C.text3}}>⏱ {w.dur}</div>}
+                    {day.log?.extraSport&&<div style={{fontSize:11,color:C.blue}}>+ {day.log.extraSport}</div>}
+                  </div>
+                  <Row style={{gap:6,flexShrink:0}}>
+                    {st==="done"&&<span style={{fontSize:13,color:"#16A34A",fontWeight:800}}>✓</span>}
+                    {st==="skipped"&&<span style={{fontSize:13,color:"#EF4444",fontWeight:800}}>✗</span>}
+                    {st==="extra"&&<span style={{fontSize:13}}>🏅</span>}
+                    <Chevron open={exp}/>
+                  </Row>
+                </Row>
+                {exp&&day.isTrain&&w?.exercises?.length>0&&(
+                  <div style={{padding:"0 14px 14px",borderTop:`1px solid ${C.borderL}`}}>
+                    {w.exercises.map((ex,ei)=>(
+                      <Row key={ei} style={{justifyContent:"space-between",padding:"8px 0",fontSize:12,borderBottom:`1px solid ${C.bg}`,color:C.text2}}>
+                        <span>{ei+1}. {ex.name}</span>
+                        <span style={{fontWeight:700,color:C.blue,flexShrink:0,marginLeft:8}}>{ex.sets&&ex.reps?`${ex.sets}×${ex.reps}`:ex.dur||""}</span>
+                      </Row>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </Card>
+      </div>}
+    </div>
+  );
+}
+
+// ── IATab ──────────────────────────────────────────────────────────────────
+function IATab({pi,goals,dailyLog}){
+  const [msgs,setMsgs]=useState([]);
+  const [inp,setInp]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [err,setErr]=useState(null);
+  const bottomRef=useRef(null);
+  const d=pi?.data;
+  const today=new Date().toISOString().split("T")[0];
+  const tl=dailyLog[today]||{};
+
+  useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:"smooth"});},[msgs]);
+
+  const sys=`Eres Meirins, asistente experta en salud hormonal femenina, nutrición adaptada al ciclo y entrenamiento.
+CONTEXTO: Fase ${d?.name} (${d?.tagline}) · Día ${pi?.day}/${pi?.cycleLen} · ${pi?.daysLeft} días restantes · Regla en ${pi?.daysToNext}d
+Intensidad: ${d?.intensity} (${d?.intensityPct}%) · Nutrientes clave: ${d?.focus?.join(", ")} · Kcal: ${d?.kcal}
+Objetivos: ${goals.join(", ")} · Estado: ${tl.mood||"—"} · Síntomas: ${tl.symptoms?.join(", ")||"ninguno"} · Energía: ${tl.energy||"—"}/5 · Agua: ${tl.water||0}/8
+INSTRUCCIONES: Responde en español, con calidez. Usa emojis. Máx 200 palabras. No des consejos médicos específicos.`;
+
+  const quick=["¿Qué como antes de entrenar hoy?","¿Puedo hacer HIIT en mi fase?","Tengo antojos de dulce 🍫","¿Cómo está mi energía esta semana?","Cuéntame sobre mi fase actual","Plan de comidas para mañana"];
+
+  async function send(text){
+    if(!text.trim()||loading)return;
+    const um={role:"user",content:text};
+    const nm=[...msgs,um];
+    setMsgs(nm);setInp("");setLoading(true);setErr(null);
+    try{
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:sys,messages:nm.map(m=>({role:m.role,content:m.content}))})});
+      const data=await res.json();
+      if(data.content?.[0]?.text)setMsgs([...nm,{role:"assistant",content:data.content[0].text}]);
+      else setErr("Sin respuesta. Inténtalo de nuevo.");
+    }catch{setErr("Error de conexión.");}
+    finally{setLoading(false);}
+  }
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 220px)"}}>
+      {msgs.length===0&&(
+        <div>
+          <div style={{background:d?.gradient,borderRadius:20,padding:"18px 16px",marginBottom:12,color:"#fff"}}>
+            <div style={{fontSize:9,opacity:.65,fontWeight:700,letterSpacing:2,marginBottom:6}}>✨ ASISTENTE IA</div>
+            <div style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:800,marginBottom:4}}>Hola, soy Meirins ⚡</div>
+            <div style={{fontSize:13,opacity:.85,lineHeight:1.65}}>Estoy aquí para ayudarte con nutrición, entrenamiento y bienestar adaptados a tu fase <strong>{d?.name}</strong>.</div>
+          </div>
+          <div style={{fontSize:10,color:C.text3,marginBottom:8,fontWeight:700,letterSpacing:1}}>PREGUNTAS FRECUENTES</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+            {quick.map(q=><button key={q} onClick={()=>send(q)} style={{padding:"8px 14px",borderRadius:20,border:`2px solid ${C.border}`,background:C.blueL,color:C.blue,fontSize:12,fontWeight:600,cursor:"pointer"}}>{q}</button>)}
+          </div>
+        </div>
+      )}
+
+      <div style={{flex:1,overflowY:"auto",marginBottom:12}}>
+        {msgs.map((m,i)=>(
+          <Row key={i} style={{justifyContent:m.role==="user"?"flex-end":"flex-start",marginBottom:10,alignItems:"flex-end"}}>
+            {m.role==="assistant"&&<div style={{width:28,height:28,borderRadius:14,background:d?.gradient,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0,marginRight:7}}>⚡</div>}
+            <div style={{maxWidth:"82%",padding:"11px 14px",borderRadius:m.role==="user"?"18px 18px 4px 18px":"18px 18px 18px 4px",background:m.role==="user"?C.blue:"#fff",color:m.role==="user"?"#fff":C.text,fontSize:13,lineHeight:1.65,boxShadow:"0 2px 12px rgba(26,86,219,.08)",border:m.role==="assistant"?`1px solid ${C.borderL}`:"none"}}>{m.content}</div>
+          </Row>
+        ))}
+        {loading&&<Row style={{justifyContent:"flex-start",marginBottom:10,alignItems:"flex-end"}}>
+          <div style={{width:28,height:28,borderRadius:14,background:d?.gradient,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0,marginRight:7}}>⚡</div>
+          <div style={{padding:"11px 16px",borderRadius:"18px 18px 18px 4px",background:"#fff",border:`1px solid ${C.borderL}`,display:"flex",gap:4,alignItems:"center"}}>
+            <span className="dot"/><span className="dot"/><span className="dot"/>
+          </div>
+        </Row>}
+        {err&&<div style={{background:"#FEF2F2",border:"1px solid #FEE2E2",borderRadius:12,padding:"10px 14px",fontSize:13,color:"#DC2626",marginBottom:8}}>{err}</div>}
+        <div ref={bottomRef}/>
+      </div>
+
+      <Row style={{gap:8,padding:"4px 0"}}>
+        <input value={inp} onChange={e=>setInp(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&send(inp)}
+          placeholder="Pregúntame sobre tu ciclo, nutrición o entreno..."
+          style={{flex:1,padding:"12px 16px",borderRadius:50,border:`2px solid ${C.border}`,fontSize:13,outline:"none",background:"#fff"}}/>
+        <button onClick={()=>send(inp)} disabled={!inp.trim()||loading} style={{width:46,height:46,borderRadius:23,border:"none",background:inp.trim()&&!loading?C.blue:C.borderL,color:"#fff",fontSize:18,cursor:inp.trim()&&!loading?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s"}}>➤</button>
+      </Row>
+    </div>
+  );
+}
+
+// ── App ────────────────────────────────────────────────────────────────────
+function App(){
+  const sv=lsGet("meirins")||{};
+  const [isSetup,setSetup]=useState(!sv.lastPeriod);
+  const [tab,setTab]=useState("home");
+  const [showCfg,setShowCfg]=useState(false);
+  const [lp,setLpS]=useState(sv.lastPeriod||"");
+  const [cl,setClS]=useState(sv.cycleLength||28);
+  const [td,setTdS]=useState(sv.trainDays||[1,2,4,5]);
+  const [goals,setGoalsS]=useState(sv.goals||["bienestar"]);
+  const [diet,setDietS]=useState(sv.diet||["sin_lactosa"]);
+  const [wLog,setWLog]=useState(lsGet("meirins_gym")||{});
+  const [dLog,setDLog]=useState(lsGet("meirins_diary")||{});
+
+  function persist(p,c,t,g,d){lsSet("meirins",{lastPeriod:p,cycleLength:c,trainDays:t,goals:g,diet:d});}
+  const setLP=v=>{setLpS(v);persist(v,cl,td,goals,diet);};
+  const setCL=v=>{setClS(v);persist(lp,v,td,goals,diet);};
+  const setGoals=v=>{const val=typeof v==="function"?v(goals):v;setGoalsS(val);persist(lp,cl,td,val,diet);};
+  const setDiet=v=>{const val=typeof v==="function"?v(diet):v;setDietS(val);persist(lp,cl,td,goals,val);};
+  const setTd=v=>{const val=typeof v==="function"?v(td):v;setTdS(val);persist(lp,cl,val,goals,diet);};
+
+  useEffect(()=>{setTimeout(()=>{const s=document.getElementById("splash");if(s)s.classList.add("hide");},900);},[]);
+
+  const pi=lp?getPhase(lp,cl):null;
+  const d=pi?.data;
+  const todayWater=dLog[new Date().toISOString().split("T")[0]]?.water||0;
+
+  if(isSetup)return <Setup done={(date,len,t,g,di)=>{setLpS(date);setClS(len);setTdS(t);setGoalsS(g);setDietS(di);persist(date,len,t,g,di);setSetup(false);}}/>;
+
+  const tabs=[{id:"home",i:"🏠",l:"Inicio"},{id:"ciclo",i:"🌙",l:"Ciclo"},{id:"nutri",i:"🥗",l:"Nutrición"},{id:"gym",i:"🏋️",l:"Entrena"},{id:"ia",i:"✨",l:"IA"}];
+
+  return(
+    <div style={{fontFamily:"'DM Sans',sans-serif",maxWidth:430,margin:"0 auto",minHeight:"100vh",display:"flex",flexDirection:"column",background:C.bg}}>
+      {/* Header */}
+      <div style={{background:d?.gradient||"linear-gradient(145deg,#0F1E4A,#1A56DB)",padding:"18px 18px 24px",color:"#fff",flexShrink:0}}>
+        <Row style={{justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+          <div>
+            <p style={{margin:0,fontSize:8,opacity:.55,letterSpacing:3,textTransform:"uppercase",fontWeight:700}}>MEIRINS</p>
+            <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:24,margin:"4px 0 0",fontWeight:800,lineHeight:1.1}}>{d?.emoji} Fase {d?.name}</h1>
+            <div style={{fontSize:11,opacity:.75,marginTop:3,fontStyle:"italic"}}>{d?.tagline}</div>
+          </div>
+          <Row style={{gap:8,alignItems:"flex-start"}}>
+            <div style={{background:"rgba(255,255,255,.15)",borderRadius:14,padding:"8px 12px",textAlign:"center",backdropFilter:"blur(8px)"}}>
+              <div style={{fontSize:26,fontWeight:800,lineHeight:1}}>{pi?.day}</div>
+              <div style={{fontSize:8,opacity:.65,marginTop:2,letterSpacing:1}}>DÍA</div>
+            </div>
+            <button onClick={()=>setShowCfg(true)} style={{width:40,height:40,borderRadius:20,background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.2)",color:"#fff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              ⚙️
+            </button>
+          </Row>
+        </Row>
+        <Row style={{gap:8}}>
+          <div style={{flex:1,background:"rgba(255,255,255,.12)",borderRadius:10,padding:"7px 12px",backdropFilter:"blur(8px)"}}>
+            <span style={{fontSize:11,opacity:.8}}>Quedan </span><strong style={{fontSize:11}}>{pi?.daysLeft} días</strong><span style={{fontSize:11,opacity:.8}}> · Regla en {pi?.daysToNext}d</span>
+          </div>
+          <div style={{background:"rgba(255,255,255,.12)",borderRadius:10,padding:"7px 12px",backdropFilter:"blur(8px)"}}>
+            <span style={{fontSize:13}}>💧</span><strong style={{fontSize:12}}> {todayWater}/8</strong>
+          </div>
+        </Row>
+      </div>
+
+      {/* Content */}
+      <div style={{flex:1,overflowY:"auto",padding:"16px 14px 90px"}}>
+        {tab==="home"&&<HomeTab pi={pi} goals={goals} setTab={setTab}/>}
+        {tab==="ciclo"&&<CicloTab pi={pi} setLP={setLP} setCL={setCL} dailyLog={dLog} setDailyLog={setDLog}/>}
+        {tab==="nutri"&&<NutriTab d={d} pi={pi} dailyLog={dLog} setDailyLog={setDLog}/>}
+        {tab==="gym"&&<EntrenoTab d={d} pi={pi} trainDays={td} wLog={wLog} setWLog={setWLog}/>}
+        {tab==="ia"&&<IATab pi={pi} goals={goals} dailyLog={dLog}/>}
+      </div>
+
+      {/* Bottom nav */}
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"min(430px,100%)",background:"#fff",borderTop:`1px solid ${C.borderL}`,display:"flex",padding:"6px 0 20px",boxShadow:"0 -4px 24px rgba(26,86,219,.08)",zIndex:100}}>
+        {tabs.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,background:"none",border:"none",cursor:"pointer",padding:"4px 0",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+            <div style={{width:40,height:34,borderRadius:12,background:tab===t.id?C.blueL:"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .18s"}}>
+              <span style={{fontSize:tab===t.id?20:18}}>{t.i}</span>
+            </div>
+            <span style={{fontSize:9,color:tab===t.id?C.blue:C.text3,fontWeight:tab===t.id?800:400}}>{t.l}</span>
+            {tab===t.id&&<div style={{width:16,height:3,borderRadius:2,background:C.blue,marginTop:1}}/>}
+          </button>
+        ))}
+      </div>
+
+      {/* Settings */}
+      {showCfg&&<Settings pi={pi} goals={goals} diet={diet} td={td} lastPeriod={lp} cycleLen={cl} onClose={()=>setShowCfg(false)} setLP={setLP} setCL={setCL} setGoals={setGoals} setDiet={setDiet} setTd={setTd} onReset={()=>{localStorage.clear();window.location.reload();}}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+
+<!-- ══ PWA: Service Worker + Update Banner ═══════════════════════════════ -->
+<script>
+(function() {
+  // ── Register service worker ──
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').then(reg => {
+        console.log('[Meirins] SW registered ✓', reg.scope);
+
+        // Detect update available
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdateBanner(newWorker);
+            }
+          });
+        });
+      }).catch(err => console.warn('[Meirins] SW registration failed:', err));
+
+      // When SW takes control, reload to get fresh content
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) { refreshing = true; window.location.reload(); }
+      });
+    });
+  }
+
+  // ── Install prompt (Android Chrome) ──
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Show our custom install button after 30s if not dismissed
+    setTimeout(() => {
+      if (deferredPrompt) showInstallBanner();
+    }, 30000);
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredPrompt = null;
+    const b = document.getElementById('meirins-install-banner');
+    if (b) b.remove();
+    console.log('[Meirins] App installed ✓');
+  });
+
+  // ── Update banner ──
+  function showUpdateBanner(worker) {
+    const banner = document.createElement('div');
+    banner.id = 'meirins-update-banner';
+    banner.innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px;max-width:400px;margin:0 auto;">
+        <span style="font-size:20px">🔄</span>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:13px">Actualización disponible</div>
+          <div style="font-size:11px;opacity:.8;margin-top:2px">Nueva versión de Meirins lista</div>
+        </div>
+        <button onclick="applyUpdate()" style="padding:7px 16px;borderRadius:20px;border:none;background:white;color:#1A56DB;fontWeight:700;cursor:pointer;fontSize:12px;whiteSpace:nowrap">Actualizar</button>
+        <button onclick="this.closest('#meirins-update-banner').remove()" style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;fontSize:18px;lineHeight:1;padding:0 4px">×</button>
+      </div>`;
+    Object.assign(banner.style, {
+      position:'fixed',top:0,left:0,right:0,zIndex:9998,
+      background:'linear-gradient(135deg,#1A56DB,#059669)',
+      color:'white',padding:'12px 16px',
+      boxShadow:'0 4px 20px rgba(26,86,219,.4)',
+      fontFamily:"'DM Sans',sans-serif",
+      animation:'slideDown .4s ease'
+    });
+    document.body.prepend(banner);
+    window._pendingWorker = worker;
+  }
+
+  window.applyUpdate = function() {
+    if (window._pendingWorker) {
+      window._pendingWorker.postMessage('SKIP_WAITING');
+    }
+  };
+
+  // ── Install banner (Android) ──
+  function showInstallBanner() {
+    if (document.getElementById('meirins-install-banner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'meirins-install-banner';
+    banner.innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px;max-width:400px;margin:0 auto;">
+        <img src="icon-192.png" style="width:40px;height:40px;border-radius:10px;" alt="Meirins"/>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:13px">Instalar Meirins</div>
+          <div style="font-size:11px;opacity:.8;margin-top:1px">Añádela a tu pantalla de inicio</div>
+        </div>
+        <button onclick="installApp()" style="padding:7px 16px;borderRadius:20px;border:none;background:white;color:#1A56DB;fontWeight:700;cursor:pointer;fontSize:12px">Instalar</button>
+        <button onclick="this.closest('#meirins-install-banner').remove()" style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;fontSize:18px;lineHeight:1;padding:0 4px">×</button>
+      </div>`;
+    Object.assign(banner.style, {
+      position:'fixed',bottom:'76px',left:'8px',right:'8px',zIndex:9997,
+      background:'linear-gradient(135deg,#0F1E4A,#1A56DB)',
+      color:'white',padding:'12px 16px',borderRadius:'16px',
+      boxShadow:'0 8px 32px rgba(15,30,74,.5)',
+      fontFamily:"'DM Sans',sans-serif",
+      animation:'slideUp .4s ease'
+    });
+    document.body.append(banner);
+  }
+
+  window.installApp = function() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(choice => {
+        deferredPrompt = null;
+        const b = document.getElementById('meirins-install-banner');
+        if (b) b.remove();
+      });
+    }
+  };
+
+  // ── iOS install hint (only shown once) ──
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.navigator.standalone;
+  const shownHint = localStorage.getItem('meirins_ios_hint');
+  if (isIOS && !isStandalone && !shownHint) {
+    setTimeout(() => {
+      const hint = document.createElement('div');
+      hint.id = 'meirins-ios-hint';
+      hint.innerHTML = `
+        <div style="display:flex;align-items:flex-start;gap:12px;max-width:400px;margin:0 auto;">
+          <img src="icon-192.png" style="width:44px;height:44px;border-radius:10px;flex-shrink:0" alt=""/>
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:14px;margin-bottom:6px">📲 Instalar Meirins como app</div>
+            <div style="font-size:12px;opacity:.85;line-height:1.6">Toca <strong>Compartir</strong> <span style="font-size:15px">⬆️</span> en Safari y luego <strong>"Añadir a pantalla de inicio"</strong> para usar Meirins como una app nativa.</div>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <button onclick="localStorage.setItem('meirins_ios_hint','1');this.closest('#meirins-ios-hint').remove()" style="padding:8px 16px;borderRadius:20px;border:none;background:white;color:#1A56DB;fontWeight:700;cursor:pointer;fontSize:12px">Entendido ✓</button>
+              <button onclick="this.closest('#meirins-ios-hint').remove()" style="padding:8px 14px;borderRadius:20px;border:1.5px solid rgba(255,255,255,.4);background:none;color:rgba(255,255,255,.8);cursor:pointer;fontSize:12px">Ahora no</button>
+            </div>
+          </div>
+        </div>`;
+      Object.assign(hint.style, {
+        position:'fixed',bottom:'80px',left:'10px',right:'10px',zIndex:9997,
+        background:'linear-gradient(135deg,#0F1E4A,#1A56DB)',
+        color:'white',padding:'16px',borderRadius:'20px',
+        boxShadow:'0 12px 40px rgba(15,30,74,.6)',
+        fontFamily:"'DM Sans',sans-serif",
+        animation:'slideUp .4s ease'
+      });
+      document.body.append(hint);
+    }, 5000);
+  }
+})();
+</script>
+<style>
+  @keyframes slideDown{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+  @keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+</style>
+
+</body>
+</html>

@@ -1,0 +1,11 @@
+*, *::before, *::after {
+  margin: 0; padding: 0; box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  background: #F0F4FA;
+  font-family: 'DM Sans', sans-serif;
+  overscroll-behavior: none;
+}
+input[type=date] { color-scheme: light; }
+::-webkit-scrollbar { display: none; }

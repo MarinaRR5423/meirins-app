@@ -4,8 +4,10 @@ import { PHASES } from '../data/phases';
 
 const BLUE = { primary: '#1A56DB', light: '#EFF6FF' };
 
+
 export default function CicloScreen({ pi, setLastPeriod, setCycleLength }) {
   const [editing, setEditing] = useState(false);
+  const [expandedPhase, setExpandedPhase] = useState(pi?.phase || null);
   const [newLen, setNewLen] = useState(pi?.cycleLen || 28);
   const d = pi?.data;
 
@@ -54,20 +56,70 @@ export default function CicloScreen({ pi, setLastPeriod, setCycleLength }) {
       </View>
 
       {Object.entries(PHASES).map(([key, ph]) => {
-        const isA = key === pi?.phase;
-        return (
-          <View key={key} style={[styles.card, isA && { borderWidth: 2, borderColor: ph.color }]}>
-            <View style={styles.phaseRow}>
-              <View>
-                <Text style={[styles.phaseTitle, { color: isA ? ph.color : '#334155' }]}>{ph.emoji} {ph.name}</Text>
-                <Text style={styles.phaseDays}>{pDays[key]}</Text>
-              </View>
-              {isA && <View style={[styles.badge, { backgroundColor: ph.color }]}><Text style={styles.badgeText}>HOY</Text></View>}
-            </View>
-            {isA && <Text style={styles.phaseDesc}>{ph.desc}</Text>}
+  const isA = key === pi?.phase;
+  const isOpen = expandedPhase === key;
+  const phaseInfo = {
+    menstrual: {
+      hormones: '📉 Estrógeno y progesterona bajos',
+      energy: '⚡ Energía reducida — escúchate',
+      body: '🩸 El útero se renueva eliminando su revestimiento',
+      tips: ['Prioriza el descanso y el calor', 'Alimentos ricos en hierro para compensar pérdidas', 'Evita el ejercicio de alta intensidad', 'El chocolate negro 85% es tu aliado'],
+    },
+    follicular: {
+      hormones: '📈 Estrógeno en ascenso',
+      energy: '⚡⚡⚡ Energía creciente — aprovéchala',
+      body: '🌱 Los folículos maduran y el cuerpo se prepara para ovular',
+      tips: ['Momento ideal para nuevos proyectos y retos', 'Tu metabolismo es más eficiente', 'Perfecta para entrenamientos de fuerza', 'Incorpora probióticos y proteína magra'],
+    },
+    ovulation: {
+      hormones: '🚀 Pico de LH y estrógeno máximo',
+      energy: '⚡⚡⚡⚡ Energía máxima absoluta',
+      body: '🥚 El óvulo es liberado — ventana fértil de 12–24h',
+      tips: ['Tu mejor momento para batir marcas', 'Sociabilidad y comunicación al máximo', 'Aprovecha para actividades de equipo', 'Antioxidantes y zinc son clave'],
+    },
+    luteal: {
+      hormones: '📊 Progesterona dominante, estrógeno bajando',
+      energy: '⚡⚡ Energía moderada — gestiona el SPM',
+      body: '🌙 El cuerpo se prepara por si no hay embarazo',
+      tips: ['Los antojos de carbohidratos son normales', 'Magnesio para reducir la retención', 'Reduce la intensidad del ejercicio progresivamente', 'Prioriza el sueño y la gestión del estrés'],
+    },
+  };
+  const info = phaseInfo[key];
+  return (
+    <TouchableOpacity key={key} onPress={() => setExpandedPhase(isOpen ? null : key)}
+      style={[styles.card, isA && { borderWidth: 2, borderColor: ph.color }]}>
+      <View style={styles.phaseRow}>
+        <View>
+          <Text style={[styles.phaseTitle, { color: isA ? ph.color : '#334155' }]}>{ph.emoji} {ph.name}</Text>
+          <Text style={styles.phaseDays}>{pDays[key]}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {isA && <View style={[styles.badge, { backgroundColor: ph.color }]}><Text style={styles.badgeText}>HOY</Text></View>}
+          <Text style={{ color: '#CBD5E1', fontSize: 14 }}>{isOpen ? '▲' : '▼'}</Text>
+        </View>
+      </View>
+      {isOpen && (
+        <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+          <Text style={styles.phaseDesc}>{ph.desc}</Text>
+          <View style={{ marginTop: 10, gap: 6 }}>
+            <Text style={{ fontSize: 12, color: '#64748B' }}>{info.hormones}</Text>
+            <Text style={{ fontSize: 12, color: '#64748B' }}>{info.energy}</Text>
+            <Text style={{ fontSize: 12, color: '#64748B' }}>{info.body}</Text>
           </View>
-        );
-      })}
+          <View style={{ marginTop: 10 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B', marginBottom: 6 }}>💡 Consejos</Text>
+            {info.tips.map((tip, i) => (
+              <View key={i} style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
+                <Text style={{ fontSize: 12, color: '#1A56DB' }}>·</Text>
+                <Text style={{ fontSize: 12, color: '#475569', flex: 1 }}>{tip}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+})}
 
       <View style={[styles.card, { borderWidth: 1, borderStyle: 'dashed', borderColor: '#CBD5E1' }]}>
         {!editing ? (

@@ -42,7 +42,13 @@ export default function App() {
           tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
         }}>
         <Tab.Screen name="Inicio" options={{ tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏠</Text> }}>
-          {() => <HomeScreen pi={pi} />}
+          {() => <HomeScreen pi={pi} profile={{
+    age: profile.age,
+    weight: profile.weight,
+    height: profile.height,
+    activityLevel: profile.activityLevel,
+    goal: profile.goal,
+  }} />}
         </Tab.Screen>
         <Tab.Screen name="Ciclo" options={{ tabBarIcon: () => <Text style={{ fontSize: 20 }}>🌙</Text> }}>
           {() => <CicloScreen pi={pi} setLastPeriod={profile.setLastPeriod} setCycleLength={profile.setCycleLength} />}

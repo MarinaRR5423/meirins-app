@@ -1,11 +1,25 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { PHASES } from '../data/phases';
 
 const BLUE = { primary: '#1A56DB', light: '#EFF6FF', mid: 'rgba(26,86,219,0.10)' };
-
-export default function HomeScreen({ pi }) {
+function calcCalories(profile, phase) {
+  if (!profile?.weight || !profile?.height || !profile?.age) return null;
+  const bmr = 10 * profile.weight + 6.25 * profile.height - 5 * profile.age - 161;
+  const actMap = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
+  const act = actMap[profile.activityLevel] || 1.55;
+  const tdee = Math.round(bmr * act);
+  const goalMap = { lose: -300, maintain: 0, gain: 300 };
+  const adj = goalMap[profile.goal] || 0;
+  const phaseAdj = { menstrual: -200, follicular: -300, ovulation: -250, luteal: 100 };
+  const total = tdee + adj + (phaseAdj[phase] || 0);
+  return { tdee, total: Math.max(1200, total) };
+}
+export default function HomeScreen({ pi, profile }) {
   const d = pi?.data;
+  const navigation = useNavigation();
+  const cals = calcCalories(profile, pi?.phase);
   const pKeys = ['menstrual', 'follicular', 'ovulation', 'luteal'];
   const pR = { menstrual: [1, 5], follicular: [6, 13], ovulation: [14, 16], luteal: [17, pi?.cycleLen || 28] };
 
@@ -55,24 +69,41 @@ export default function HomeScreen({ pi }) {
               <View style={[styles.intensityFill, { width: `${d?.intensityPct}%`, backgroundColor: d?.color }]} />
             </View>
           </View>
-          <View style={[styles.card, styles.gridCard]}>
-            <Text style={styles.cardLabel}>SESIÓN HOY</Text>
-            <Text style={{ fontSize: 22 }}>{d?.week[0].ico}</Text>
-            <Text style={styles.sessionName}>{d?.week[0].name}</Text>
-            {d?.week[0].dur ? <Text style={[styles.sessionDur, { color: BLUE.primary }]}>{d?.week[0].dur}</Text> : null}
-          </View>
+          <TouchableOpacity onPress={() => navigation.navigate('Gimnasio')} style={[styles.card, styles.gridCard]}>
+  <Text style={styles.cardLabel}>SESIÓN HOY</Text>
+  <Text style={{ fontSize: 22 }}>{d?.week[0].ico}</Text>
+  <Text style={styles.sessionName}>{d?.week[0].name}</Text>
+  {d?.week[0].dur ? <Text style={[styles.sessionDur, { color: BLUE.primary }]}>{d?.week[0].dur}</Text> : null}
+</TouchableOpacity>
         </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>🥗 Nutrición de hoy</Text>
-          <View style={styles.tags}>
-            {d?.focus.map(f => <View key={f} style={styles.tag}><Text style={styles.tagLabel}>{f}</Text></View>)}
-          </View>
-          <View style={[styles.highlight, { borderLeftColor: BLUE.primary }]}>
-            <Text style={styles.highlightTitle}>{d?.meals[0].ico} {d?.meals[0].title}</Text>
-            <Text style={styles.highlightSub}>{d?.meals[0].items.join(' · ')}</Text>
-          </View>
-        </View>
+{cals && (
+  <View style={styles.card}>
+    <Text style={styles.sectionTitle}>🔥 Calorías objetivo hoy</Text>
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+      <View style={{ alignItems: 'center' }}>
+        <Text style={{ fontSize: 32, fontWeight: '700', color: d?.color }}>{cals.total}</Text>
+        <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>kcal · objetivo fase</Text>
+      </View>
+      <View style={{ alignItems: 'center' }}>
+        <Text style={{ fontSize: 20, fontWeight: '600', color: '#475569' }}>{cals.tdee}</Text>
+        <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>kcal · mantenimiento</Text>
+      </View>
+      <View style={{ backgroundColor: d?.mid, borderRadius: 10, padding: 10, alignItems: 'center' }}>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: d?.color }}>{d?.kcal?.split('·')[0]}</Text>
+      </View>
+    </View>
+  </View>
+)}
+        <TouchableOpacity onPress={() => navigation.navigate('Nutrición')} style={styles.card}>
+  <Text style={styles.sectionTitle}>🥗 Nutrición de hoy</Text>
+  <View style={styles.tags}>
+    {d?.focus.map(f => <View key={f} style={styles.tag}><Text style={styles.tagLabel}>{f}</Text></View>)}
+  </View>
+  <View style={[styles.highlight, { borderLeftColor: BLUE.primary }]}>
+    <Text style={styles.highlightTitle}>{d?.meals[0].ico} {d?.meals[0].title}</Text>
+    <Text style={styles.highlightSub}>{d?.meals[0].items.join(' · ')}</Text>
+  </View>
+</TouchableOpacity>
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>💡 Consejo de la fase</Text>

@@ -21,6 +21,7 @@ export default function GimnasioScreen({ pi, trainDays, setTrainDays }) {
   const todayWorkout = d?.week[todayWeekIdx];
   const todayLog = workoutLog[todayKey];
 
+  if (!pi) return null;
   const saveLog = (update) => setWorkoutLog(prev => ({ ...prev, [todayKey]: update }));
 
   const toggleTempDay = (dv) => {
@@ -32,7 +33,7 @@ export default function GimnasioScreen({ pi, trainDays, setTrainDays }) {
     const date = new Date(); date.setDate(date.getDate() + i);
     const dow = date.getDay();
     const wIdx = jsToIdx[dow];
-    const cd = ((pi.day - 1 + i) % pi.cycleLen) + 1;
+    const cd = (((pi?.day ?? 1) - 1 + i) % (pi?.cycleLen ?? 28)) + 1;
     const phase = cd <= 5 ? 'menstrual' : cd <= 13 ? 'follicular' : cd <= 16 ? 'ovulation' : 'luteal';
     const dateKey = date.toISOString().split('T')[0];
     return { date, dow, isTrain: trainDays.includes(dow), wIdx, phase, pd: PHASES[phase], log: workoutLog[dateKey], dateKey, dayNum: date.getDate(), dayLabel: i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : DAY_LABELS[dow] };

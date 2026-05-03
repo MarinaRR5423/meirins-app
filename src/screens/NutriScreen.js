@@ -34,6 +34,7 @@ export default function NutriScreen({ pi }) {
   const [openM, setOpenM] = useState(null);
   const [openD, setOpenD] = useState(null);
   const [recipe, setRecipe] = useState(null);
+  const [altMeal, setAltMeal] = useState({});
   const d = pi?.data;
   const totalPeople = adults + children;
 
@@ -86,8 +87,10 @@ export default function NutriScreen({ pi }) {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>👨‍👩‍👧 Personas en el hogar</Text>
         <View style={styles.personsRow}>
-          {[{ label: '👤 Adultos', val: adults, set: setAdults, min: 1, max: 8, color: BLUE.primary },
-            { label: '🧒 Niños', val: children, set: setChildren, min: 0, max: 6, color: '#64748B' }].map(p => (
+          {[
+            { label: '👤 Adultos', val: adults, set: setAdults, min: 1, max: 8, color: BLUE.primary },
+            { label: '🧒 Niños', val: children, set: setChildren, min: 0, max: 6, color: '#64748B' }
+          ].map(p => (
             <View key={p.label} style={styles.personBox}>
               <Text style={styles.personLabel}>{p.label}</Text>
               <View style={styles.counter}>
@@ -124,6 +127,7 @@ export default function NutriScreen({ pi }) {
             {d?.focus.map(f => <View key={f} style={styles.tagFill}><Text style={styles.tagFillText}>{f}</Text></View>)}
           </View>
         </View>
+
         {d?.meals.map((m, i) => (
           <View key={m.t} style={styles.card}>
             <TouchableOpacity style={styles.mealRow} onPress={() => setOpenM(openM === i ? null : i)}>
@@ -134,12 +138,43 @@ export default function NutriScreen({ pi }) {
               </View>
               <Text style={styles.chevron}>{openM === i ? '▲' : '▼'}</Text>
             </TouchableOpacity>
-            {openM === i && <View style={styles.mealDetail}>
-              {m.items.map(it => <View key={it} style={styles.listRow}><View style={styles.dot} /><Text style={styles.listText}>{it}</Text></View>)}
-              {m.recipe && <TouchableOpacity style={styles.recipeBtn} onPress={() => setRecipe({ meal: m.t, title: m.title, ...m.recipe })}>
-                <Text style={styles.recipeBtnText}>👩‍🍳 Ver receta completa</Text>
-              </TouchableOpacity>}
-            </View>}
+
+            {openM === i && (
+              <View style={styles.mealDetail}>
+                {m.items.map(it => (
+                  <View key={it} style={styles.listRow}>
+                    <View style={styles.dot} />
+                    <Text style={styles.listText}>{it}</Text>
+                  </View>
+                ))}
+
+                {m.recipe && (
+                  <TouchableOpacity style={styles.recipeBtn} onPress={() => setRecipe({ meal: m.t, title: m.title, ...m.recipe })}>
+                    <Text style={styles.recipeBtnText}>👩‍🍳 Ver receta completa</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={[styles.recipeBtn, { marginTop: 8, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' }]}
+                  onPress={() => setAltMeal(prev => ({ ...prev, [i]: !prev[i] }))}>
+                  <Text style={[styles.recipeBtnText, { color: '#64748B' }]}>
+                    🔄 {altMeal[i] ? 'Ver plato original' : 'Cambiar este plato'}
+                  </Text>
+                </TouchableOpacity>
+
+                {altMeal[i] && (
+                  <View style={{ marginTop: 8, padding: 12, backgroundColor: '#F0FDF4', borderRadius: 12 }}>
+                    <Text style={{ fontSize: 11, color: '#16A34A', fontWeight: '700', marginBottom: 4 }}>ALTERNATIVA</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#1E293B' }}>
+                      {d?.meals[(i + 1) % d.meals.length].ico} {d?.meals[(i + 1) % d.meals.length].title}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
+                      {d?.meals[(i + 1) % d.meals.length].items.join(' · ')}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
         ))}
       </>}
@@ -160,17 +195,27 @@ export default function NutriScreen({ pi }) {
               </View>
               <Text style={styles.chevron}>{openD === i ? '▲' : '▼'}</Text>
             </TouchableOpacity>
-            {openD === i && <View style={styles.mealDetail}>
-              {day.pd.meals.map(meal => (
-                <View key={meal.t} style={{ marginBottom: 12 }}>
-                  <Text style={[styles.mealTag, { color: BLUE.primary, marginBottom: 4 }]}>{meal.ico} {meal.t} — {meal.title}</Text>
-                  {meal.items.map(it => <View key={it} style={styles.listRow}><View style={styles.dot} /><Text style={styles.listText}>{it}</Text></View>)}
-                  {meal.recipe && <TouchableOpacity style={[styles.recipeBtn, { marginTop: 8 }]} onPress={() => setRecipe({ meal: meal.t, title: meal.title, ...meal.recipe })}>
-                    <Text style={styles.recipeBtnText}>👩‍🍳 Ver receta</Text>
-                  </TouchableOpacity>}
-                </View>
-              ))}
-            </View>}
+
+            {openD === i && (
+              <View style={styles.mealDetail}>
+                {day.pd.meals.map(meal => (
+                  <View key={meal.t} style={{ marginBottom: 12 }}>
+                    <Text style={[styles.mealTag, { color: BLUE.primary, marginBottom: 4 }]}>{meal.ico} {meal.t} — {meal.title}</Text>
+                    {meal.items.map(it => (
+                      <View key={it} style={styles.listRow}>
+                        <View style={styles.dot} />
+                        <Text style={styles.listText}>{it}</Text>
+                      </View>
+                    ))}
+                    {meal.recipe && (
+                      <TouchableOpacity style={[styles.recipeBtn, { marginTop: 8 }]} onPress={() => setRecipe({ meal: meal.t, title: meal.title, ...meal.recipe })}>
+                        <Text style={styles.recipeBtnText}>👩‍🍳 Ver receta</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         ))}
       </>}
@@ -178,7 +223,10 @@ export default function NutriScreen({ pi }) {
       {sub === 'lista' && <>
         <View style={[styles.card, { backgroundColor: BLUE.light }]}>
           <Text style={[styles.sectionTitle, { color: BLUE.primary }]}>🛒 Lista de la compra semanal</Text>
-          <Text style={styles.listSub}><Text style={{ fontWeight: '700' }}>{adults} adulto{adults > 1 ? 's' : ''}</Text>{children > 0 ? ` + ${children} niño${children > 1 ? 's' : ''}` : ''} · próximos 7 días</Text>
+          <Text style={styles.listSub}>
+            <Text style={{ fontWeight: '700' }}>{adults} adulto{adults > 1 ? 's' : ''}</Text>
+            {children > 0 ? ` + ${children} niño${children > 1 ? 's' : ''}` : ''} · próximos 7 días
+          </Text>
         </View>
         {Object.entries(shopData).map(([cat, items]) => (
           <View key={cat} style={styles.card}>

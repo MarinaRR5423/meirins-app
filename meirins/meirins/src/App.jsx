@@ -11,6 +11,16 @@ const sb = createClient(
 // ── CONSTANTES VISUALES (no vienen de la BD) ─────────────────────────────────
 const BLUE = { primary:'#1A56DB', dark:'#1E3A8A', light:'#EFF6FF', mid:'rgba(26,86,219,0.10)', text:'#1E40AF' }
 
+const SPORT_CHIPS = [
+  {ico:'🤸',name:'Calistenia 30min'},
+  {ico:'🏃',name:'Correr 30min'},
+  {ico:'🚴',name:'Bici 45min'},
+  {ico:'🏊',name:'Natación 30min'},
+  {ico:'🧘',name:'Yoga 30min'},
+  {ico:'⚽',name:'Fútbol 1h'},
+  {ico:'🎾',name:'Tenis 1h'},
+]
+
 const PHASE_VISUAL = {
   menstrual:  { color:'#64748B', light:'#F8FAFC', mid:'rgba(100,116,139,0.10)' },
   follicular: { color:'#2563EB', light:'#EFF6FF', mid:'rgba(37,99,235,0.10)'   },
@@ -583,7 +593,7 @@ function NutriTab({d,pi}){
 }
 
 // ── GIMNASIO ──────────────────────────────────────────────────────────────────
-function GimnasioTab({d,pi,trainDays,workoutLog,setWorkoutLog}){
+function GimnasioTab({d,pi,trainDays,setTrainDays,workoutLog,setWorkoutLog}){
   const [sub,setSub]=useState('hoy')
   const [extraInput,setExtraInput]=useState('')
   const [addingSport,setAddingSport]=useState(false)
@@ -610,7 +620,7 @@ function GimnasioTab({d,pi,trainDays,workoutLog,setWorkoutLog}){
   })
   return(<div>
     <div style={{display:'flex',background:'white',borderRadius:50,padding:4,marginBottom:14,boxShadow:'0 2px 10px rgba(0,0,0,0.06)'}}>
-      {[{id:'hoy',l:'Hoy'},{id:'semana',l:'Semana'}].map(t=>(
+      {[{id:'hoy',l:'Hoy'},{id:'semana',l:'Semana'},{id:'perfil',l:'Perfil'}].map(t=>(
         <button key={t.id} onClick={()=>setSub(t.id)} style={{flex:1,padding:'9px 6px',borderRadius:46,border:'none',fontSize:13,fontWeight:sub===t.id?700:400,background:sub===t.id?BLUE.primary:'transparent',color:sub===t.id?'white':'#94A3B8',cursor:'pointer',transition:'all 0.2s'}}>{t.l}</button>
       ))}
     </div>
@@ -670,11 +680,21 @@ function GimnasioTab({d,pi,trainDays,workoutLog,setWorkoutLog}){
                 <button onClick={()=>saveLog({...todayLog,extraSport:''})} style={{background:'none',border:'none',color:'#94A3B8',cursor:'pointer',fontSize:18,lineHeight:1}}>×</button>
               </div>
             ):addingSport?(
-              <div style={{display:'flex',gap:8}}>
-                <input value={extraInput} onChange={e=>setExtraInput(e.target.value)} placeholder="Ej: Tenis 1h, Pádel 90min..."
-                  style={{flex:1,padding:'10px 12px',borderRadius:10,border:'1px solid #E2E8F0',fontSize:13,outline:'none'}}/>
-                <button onClick={()=>{saveLog({...(todayLog||{status:'done'}),extraSport:extraInput});setAddingSport(false);setExtraInput('')}}
-                  style={{padding:'10px 16px',borderRadius:10,border:'none',background:BLUE.primary,color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>Añadir</button>
+              <div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:10}}>
+                  {SPORT_CHIPS.map(ch=>(
+                    <button key={ch.name} onClick={()=>{saveLog({...(todayLog||{status:'done'}),extraSport:ch.name});setAddingSport(false);setExtraInput('')}}
+                      style={{padding:'6px 12px',borderRadius:20,border:`1.5px solid ${BLUE.primary}`,background:BLUE.light,color:BLUE.primary,fontSize:12,fontWeight:500,cursor:'pointer'}}>
+                      {ch.ico} {ch.name}
+                    </button>
+                  ))}
+                </div>
+                <div style={{display:'flex',gap:8}}>
+                  <input value={extraInput} onChange={e=>setExtraInput(e.target.value)} placeholder="Otro: Pádel 90min..."
+                    style={{flex:1,padding:'10px 12px',borderRadius:10,border:'1px solid #E2E8F0',fontSize:13,outline:'none'}}/>
+                  <button onClick={()=>{saveLog({...(todayLog||{status:'done'}),extraSport:extraInput});setAddingSport(false);setExtraInput('')}}
+                    style={{padding:'10px 16px',borderRadius:10,border:'none',background:BLUE.primary,color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>Añadir</button>
+                </div>
               </div>
             ):(
               <button onClick={()=>setAddingSport(true)} style={{width:'100%',padding:'10px',borderRadius:12,border:'1.5px dashed #CBD5E1',background:'white',color:'#64748B',cursor:'pointer',fontSize:13}}>
@@ -693,11 +713,21 @@ function GimnasioTab({d,pi,trainDays,workoutLog,setWorkoutLog}){
           <C>
             <div style={{fontSize:13,fontWeight:600,color:'#1E293B',marginBottom:10}}>¿Has hecho algo hoy? Regístralo</div>
             {addingSport?(
-              <div style={{display:'flex',gap:8}}>
-                <input value={extraInput} onChange={e=>setExtraInput(e.target.value)} placeholder="Ej: Paseo 30min, Natación..."
-                  style={{flex:1,padding:'10px 12px',borderRadius:10,border:'1px solid #E2E8F0',fontSize:13,outline:'none'}}/>
-                <button onClick={()=>{saveLog({status:'extra',extraSport:extraInput});setAddingSport(false);setExtraInput('')}}
-                  style={{padding:'10px 16px',borderRadius:10,border:'none',background:BLUE.primary,color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>Añadir</button>
+              <div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:10}}>
+                  {SPORT_CHIPS.map(ch=>(
+                    <button key={ch.name} onClick={()=>{saveLog({status:'extra',extraSport:ch.name});setAddingSport(false);setExtraInput('')}}
+                      style={{padding:'6px 12px',borderRadius:20,border:`1.5px solid ${BLUE.primary}`,background:BLUE.light,color:BLUE.primary,fontSize:12,fontWeight:500,cursor:'pointer'}}>
+                      {ch.ico} {ch.name}
+                    </button>
+                  ))}
+                </div>
+                <div style={{display:'flex',gap:8}}>
+                  <input value={extraInput} onChange={e=>setExtraInput(e.target.value)} placeholder="Otro: Paseo 30min..."
+                    style={{flex:1,padding:'10px 12px',borderRadius:10,border:'1px solid #E2E8F0',fontSize:13,outline:'none'}}/>
+                  <button onClick={()=>{saveLog({status:'extra',extraSport:extraInput});setAddingSport(false);setExtraInput('')}}
+                    style={{padding:'10px 16px',borderRadius:10,border:'none',background:BLUE.primary,color:'white',fontWeight:600,cursor:'pointer',fontSize:13}}>Añadir</button>
+                </div>
               </div>
             ):(
               <button onClick={()=>setAddingSport(true)} style={{width:'100%',padding:'10px',borderRadius:12,border:'1.5px dashed #CBD5E1',background:'white',color:'#64748B',cursor:'pointer',fontSize:13}}>
@@ -746,6 +776,61 @@ function GimnasioTab({d,pi,trainDays,workoutLog,setWorkoutLog}){
         </div>
       </C>
     </div>}
+    {sub==='perfil'&&<div>
+      <C style={{background:BLUE.light,border:`1px solid ${BLUE.primary}22`}}>
+        <div style={{fontSize:14,fontWeight:700,color:BLUE.primary,marginBottom:4}}>👤 Tu perfil de entrenamiento</div>
+        <div style={{fontSize:12,color:'#64748B'}}>Personaliza tu programa de fitness</div>
+      </C>
+      <C>
+        <div style={{fontSize:13,fontWeight:700,color:'#1E293B',marginBottom:12}}>📅 Días de entrenamiento</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:5,marginBottom:10}}>
+          {[0,1,2,3,4,5,6].map(dv=>{
+            const active=trainDays.includes(dv)
+            return(
+              <button key={dv} onClick={()=>{
+                let updated
+                if(active){if(trainDays.length>2)updated=trainDays.filter(x=>x!==dv)}
+                else{if(trainDays.length<6)updated=[...trainDays,dv].sort()}
+                if(updated)setTrainDays(updated)
+              }}
+                style={{padding:'10px 0',borderRadius:10,border:active?'none':'1px solid #E2E8F0',background:active?BLUE.primary:'#F8FAFC',color:active?'white':'#94A3B8',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
+                <span style={{fontSize:10,fontWeight:600}}>{DAY_SHORT[dv]}</span>
+                <span style={{fontSize:13}}>{active?'💪':'😴'}</span>
+              </button>
+            )
+          })}
+        </div>
+        <div style={{fontSize:11,color:'#94A3B8',textAlign:'center'}}>Mín. 2 · Máx. 6 días · Toca para activar/desactivar</div>
+      </C>
+      <C>
+        <div style={{fontSize:13,fontWeight:700,color:'#1E293B',marginBottom:12}}>🏋️ Programa actual por fase</div>
+        {Object.entries(PHASES_LOCAL).map(([key,ph])=>{
+          const isActive=key===pi?.phase
+          return(
+            <div key={key} style={{padding:'10px 12px',borderRadius:12,background:isActive?BLUE.light:'#F8FAFC',border:`1.5px solid ${isActive?BLUE.primary:'#E2E8F0'}`,marginBottom:8}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                <span style={{fontSize:13,fontWeight:600,color:isActive?BLUE.primary:'#334155'}}>{ph.emoji} Fase {ph.name}</span>
+                {isActive&&<span style={{background:BLUE.primary,color:'white',fontSize:10,padding:'2px 8px',borderRadius:20,fontWeight:700}}>AHORA</span>}
+              </div>
+              <div style={{fontSize:12,color:'#64748B',marginBottom:6}}>{ph.intensity} · {ph.intensityPct}% intensidad</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                {ph.week.filter(w=>w.on).map((w,i)=>(
+                  <span key={i} style={{background:'white',border:'1px solid #E2E8F0',borderRadius:20,padding:'3px 9px',fontSize:11,color:'#475569'}}>
+                    {w.ico} {w.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </C>
+      <C style={{border:'1px dashed #CBD5E1'}}>
+        <div style={{fontSize:12,color:'#64748B',textAlign:'center',lineHeight:1.6}}>
+          💡 El programa de ejercicios se adapta automáticamente a tu fase del ciclo menstrual.<br/>
+          <span style={{color:BLUE.primary,fontWeight:500}}>Ve a la pestaña Ciclo para actualizar tus fechas.</span>
+        </div>
+      </C>
+    </div>}
   </div>)
 }
 
@@ -782,6 +867,7 @@ export default function App(){
   const persist=(lp,cl,td)=>{try{localStorage.setItem('meirins',JSON.stringify({lastPeriod:lp,cycleLength:cl,trainDays:td}))}catch{}}
   const setLastPeriod=(v)=>{setLP(v);persist(v,cycleLength,trainDays)}
   const setCycleLength=(v)=>{setCL(v);persist(lastPeriod,v,trainDays)}
+  const setTrainDays=(v)=>{setTD(v);persist(lastPeriod,cycleLength,v)}
 
   useEffect(()=>{
     setTimeout(()=>setSplash(false),900)
@@ -833,7 +919,7 @@ export default function App(){
         {tab==='home'&&<HomeTab pi={pi}/>}
         {tab==='ciclo'&&<CicloTab pi={pi} setLastPeriod={setLastPeriod} setCycleLength={setCycleLength}/>}
         {tab==='nutri'&&<NutriTab d={d} pi={pi}/>}
-        {tab==='gym'&&<GimnasioTab d={d} pi={pi} trainDays={trainDays} workoutLog={workoutLog} setWorkoutLog={setWorkoutLog}/>}
+        {tab==='gym'&&<GimnasioTab d={d} pi={pi} trainDays={trainDays} setTrainDays={setTrainDays} workoutLog={workoutLog} setWorkoutLog={setWorkoutLog}/>}
         {tab==='ia'&&<IATab/>}
       </div>
 

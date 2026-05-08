@@ -4,6 +4,16 @@ import { PHASES, DAY_SHORT, DAY_LABELS, jsToIdx } from '../data/phases';
 
 const BLUE = { primary: '#1A56DB', light: '#EFF6FF', mid: 'rgba(26,86,219,0.10)' };
 
+const SPORT_CHIPS = [
+  { ico: '🤸', name: 'Calistenia 30min' },
+  { ico: '🏃', name: 'Correr 30min' },
+  { ico: '🚴', name: 'Bici 45min' },
+  { ico: '🏊', name: 'Natación 30min' },
+  { ico: '🧘', name: 'Yoga 30min' },
+  { ico: '⚽', name: 'Fútbol 1h' },
+  { ico: '🎾', name: 'Tenis 1h' },
+];
+
 export default function GimnasioScreen({ pi, trainDays, setTrainDays }) {
   const [sub, setSub] = useState('hoy');
   const [extraInput, setExtraInput] = useState('');
@@ -118,11 +128,21 @@ export default function GimnasioScreen({ pi, trainDays, setTrainDays }) {
                 </TouchableOpacity>
               </View>
             ) : addingSport ? (
-              <View style={styles.extraInput}>
-                <TextInput style={styles.input} value={extraInput} onChangeText={setExtraInput} placeholder="Ej: Tenis 1h, Pádel 90min..." />
-                <TouchableOpacity style={styles.addBtn} onPress={() => { saveLog({ ...(todayLog || { status: 'done' }), extraSport: extraInput }); setAddingSport(false); setExtraInput(''); }}>
-                  <Text style={styles.addBtnText}>Añadir</Text>
-                </TouchableOpacity>
+              <View>
+                <View style={styles.chipsWrap}>
+                  {SPORT_CHIPS.map(ch => (
+                    <TouchableOpacity key={ch.name} style={styles.sportChip}
+                      onPress={() => { saveLog({ ...(todayLog || { status: 'done' }), extraSport: ch.name }); setAddingSport(false); setExtraInput(''); }}>
+                      <Text style={styles.sportChipText}>{ch.ico} {ch.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={styles.extraInput}>
+                  <TextInput style={styles.input} value={extraInput} onChangeText={setExtraInput} placeholder="Otro: Pádel 90min..." />
+                  <TouchableOpacity style={styles.addBtn} onPress={() => { if (extraInput.trim()) { saveLog({ ...(todayLog || { status: 'done' }), extraSport: extraInput }); setAddingSport(false); setExtraInput(''); } }}>
+                    <Text style={styles.addBtnText}>Añadir</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ) : (
               <TouchableOpacity style={styles.dashedBtn} onPress={() => setAddingSport(true)}>
@@ -146,11 +166,21 @@ export default function GimnasioScreen({ pi, trainDays, setTrainDays }) {
                 </TouchableOpacity>
               </View>
             ) : addingSport ? (
-              <View style={styles.extraInput}>
-                <TextInput style={styles.input} value={extraInput} onChangeText={setExtraInput} placeholder="Ej: Paseo 30min, Natación..." />
-                <TouchableOpacity style={styles.addBtn} onPress={() => { saveLog({ status: 'extra', extraSport: extraInput }); setAddingSport(false); setExtraInput(''); }}>
-                  <Text style={styles.addBtnText}>Añadir</Text>
-                </TouchableOpacity>
+              <View>
+                <View style={styles.chipsWrap}>
+                  {SPORT_CHIPS.map(ch => (
+                    <TouchableOpacity key={ch.name} style={styles.sportChip}
+                      onPress={() => { saveLog({ status: 'extra', extraSport: ch.name }); setAddingSport(false); setExtraInput(''); }}>
+                      <Text style={styles.sportChipText}>{ch.ico} {ch.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={styles.extraInput}>
+                  <TextInput style={styles.input} value={extraInput} onChangeText={setExtraInput} placeholder="Otro: Paseo 30min..." />
+                  <TouchableOpacity style={styles.addBtn} onPress={() => { if (extraInput.trim()) { saveLog({ status: 'extra', extraSport: extraInput }); setAddingSport(false); setExtraInput(''); } }}>
+                    <Text style={styles.addBtnText}>Añadir</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ) : (
               <TouchableOpacity style={styles.dashedBtn} onPress={() => setAddingSport(true)}>
@@ -158,7 +188,7 @@ export default function GimnasioScreen({ pi, trainDays, setTrainDays }) {
               </TouchableOpacity>
             )}
           </View>
-        </>}
+        </> }
       </>}
 
       {sub === 'semana' && <>
@@ -261,6 +291,9 @@ const styles = StyleSheet.create({
   extraRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10, backgroundColor: '#F0FDF4', borderRadius: 10 },
   extraText: { fontSize: 13, color: '#166534', fontWeight: '500' },
   extraRemove: { color: '#94A3B8', fontSize: 18 },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  sportChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: '#1A56DB', backgroundColor: '#EFF6FF' },
+  sportChipText: { fontSize: 12, color: '#1A56DB', fontWeight: '500' },
   extraInput: { flexDirection: 'row', gap: 8 },
   input: { flex: 1, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', fontSize: 13 },
   addBtn: { padding: 10, paddingHorizontal: 16, borderRadius: 10, backgroundColor: '#1A56DB', justifyContent: 'center' },

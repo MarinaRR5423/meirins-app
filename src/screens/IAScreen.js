@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
+import { PHASES } from '../data/phases';
 
 const BLUE = { primary: '#1A56DB', light: '#EFF6FF' };
 
@@ -25,10 +26,10 @@ const DIETARY_OPTIONS = [
 ];
 
 const DAY_SHORT = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
-const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 export default function PerfilScreen({ pi, profile, signOut }) {
   const [editing, setEditing] = useState(null);
+  const [expandedPhase, setExpandedPhase] = useState(null);
   const [age, setAge] = useState(String(profile?.age || ''));
   const [weight, setWeight] = useState(String(profile?.weight || ''));
   const [height, setHeight] = useState(String(profile?.height || ''));
@@ -214,15 +215,50 @@ export default function PerfilScreen({ pi, profile, signOut }) {
         )}
       </View>
 
-      {/* IA */}
-      <View style={[styles.card, { backgroundColor: BLUE.light }]}>
-        <Text style={[styles.cardTitle, { color: BLUE.primary, marginBottom: 8 }]}>✨ Asistente IA</Text>
-        <Text style={styles.iaDesc}>Próximamente podrás preguntarle al asistente IA sobre tu ciclo, nutrición y entrenos.</Text>
-        <View style={styles.iaExamples}>
-          {['¿Qué como antes de entrenar?', '¿Puedo hacer HIIT hoy?', 'Tengo antojos, ¿qué hago?'].map(q => (
-            <View key={q} style={styles.iaQ}><Text style={styles.iaQText}>· {q}</Text></View>
-          ))}
-        </View>
+      {/* PROGRAMA DE FITNESS */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>🏋️ Programa de fitness</Text>
+        <Text style={styles.programDesc}>Tu entrenamiento se adapta automáticamente a cada fase del ciclo. Toca una fase para ver sus ejercicios.</Text>
+        {Object.entries(PHASES).map(([key, ph]) => {
+          const isActive = pi?.phase === key;
+          const isExpanded = expandedPhase === key;
+          return (
+            <TouchableOpacity key={key}
+              onPress={() => setExpandedPhase(isExpanded ? null : key)}
+              style={[styles.phaseCard, isActive && { borderColor: ph.color, backgroundColor: ph.light }]}>
+              <View style={styles.phaseHeader}>
+                <Text style={styles.phaseName}>{ph.emoji} Fase {ph.name}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {isActive && (
+                    <View style={[styles.activeBadge, { backgroundColor: ph.color }]}>
+                      <Text style={styles.activeBadgeText}>HOY</Text>
+                    </View>
+                  )}
+                  <Text style={styles.expandArrow}>{isExpanded ? '▲' : '▼'}</Text>
+                </View>
+              </View>
+              <View style={styles.phaseIntensityRow}>
+                <Text style={[styles.phaseIntensity, { color: ph.color }]}>{ph.intensity}</Text>
+                <View style={styles.phaseBar}>
+                  <View style={[styles.phaseFill, { width: `${ph.intensityPct}%`, backgroundColor: ph.color }]} />
+                </View>
+              </View>
+              {isExpanded && (
+                <View style={styles.phaseWorkouts}>
+                  {ph.week.filter(w => w.on).map((w, i) => (
+                    <View key={i} style={styles.phaseWorkoutRow}>
+                      <Text style={styles.phaseWorkoutIco}>{w.ico}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.phaseWorkoutName}>{w.name}</Text>
+                        {w.dur ? <Text style={styles.phaseWorkoutDur}>{w.dur}</Text> : null}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* CERRAR SESIÓN */}
@@ -243,7 +279,7 @@ const styles = StyleSheet.create({
   headerSub: { fontSize: 13, color: '#64748B', marginTop: 4 },
   card: { backgroundColor: 'white', borderRadius: 18, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  cardTitle: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
+  cardTitle: { fontSize: 14, fontWeight: '600', color: '#1E293B', marginBottom: 10 },
   editBtn: { fontSize: 13, color: '#1A56DB', fontWeight: '600' },
   infoGrid: { flexDirection: 'row', gap: 10 },
   infoBox: { flex: 1, backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12, alignItems: 'center' },
@@ -274,10 +310,22 @@ const styles = StyleSheet.create({
   daysRow: { flexDirection: 'row', gap: 5 },
   dayChip: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
   dayChipText: { fontSize: 11, fontWeight: '600' },
-  iaDesc: { fontSize: 13, color: '#475569', lineHeight: 20, marginBottom: 12 },
-  iaExamples: { backgroundColor: 'white', borderRadius: 12, padding: 12 },
-  iaQ: { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  iaQText: { fontSize: 13, color: '#475569' },
+  programDesc: { fontSize: 12, color: '#64748B', marginBottom: 12, lineHeight: 18 },
+  phaseCard: { borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 14, padding: 12, marginBottom: 8 },
+  phaseHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  phaseName: { fontSize: 14, fontWeight: '600', color: '#334155' },
+  activeBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
+  activeBadgeText: { fontSize: 10, color: 'white', fontWeight: '700' },
+  expandArrow: { fontSize: 11, color: '#94A3B8' },
+  phaseIntensityRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  phaseIntensity: { fontSize: 12, fontWeight: '600', width: 72 },
+  phaseBar: { flex: 1, height: 4, backgroundColor: '#E2E8F0', borderRadius: 2, overflow: 'hidden' },
+  phaseFill: { height: '100%', borderRadius: 2 },
+  phaseWorkouts: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  phaseWorkoutRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
+  phaseWorkoutIco: { fontSize: 20, flexShrink: 0 },
+  phaseWorkoutName: { fontSize: 13, color: '#334155', fontWeight: '500' },
+  phaseWorkoutDur: { fontSize: 11, color: '#94A3B8', marginTop: 1 },
   signOutBtn: { marginTop: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: 'white', alignItems: 'center' },
   signOutText: { fontSize: 14, color: '#64748B', fontWeight: '500' },
 });

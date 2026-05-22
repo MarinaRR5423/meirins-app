@@ -269,6 +269,23 @@ function AuthScreen({onAuth}){
   const [error,setError]=useState("");
   const [confirmEmail,setConfirmEmail]=useState("");
 
+  useEffect(()=>{
+    const hash=window.location.hash;
+    if(hash.includes("error_code=otp_expired")||hash.includes("error=access_denied")){
+      setMode("otp_expired");
+      history.replaceState(null,"",window.location.pathname);
+    }
+  },[]);
+
+  const handleResend=async()=>{
+    if(!email)return setError("Ingresa tu email para reenviar el enlace");
+    setLoading(true);setError("");
+    const{error:err}=await supabase.auth.resend({type:"signup",email});
+    setLoading(false);
+    if(err)setError(err.message);
+    else{setConfirmEmail(email);setMode("confirm");}
+  };
+
   const inputStyle={
     width:"100%",padding:"13px 16px",borderRadius:14,
     border:"1px solid rgba(255,255,255,0.25)",
@@ -301,6 +318,33 @@ function AuthScreen({onAuth}){
     if(err)setError(err.message);
     else{setConfirmEmail(email);setMode("confirm");}
   };
+
+  if(mode==="otp_expired")return(
+    <div style={{minHeight:"100vh",background:BG,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:28}}>
+      <div style={{textAlign:"center",color:"white",maxWidth:360,width:"100%"}}>
+        <div style={{fontSize:64,marginBottom:16}}>⏰</div>
+        <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:26,margin:"0 0 12px"}}>El enlace ha caducado</h2>
+        <p style={{fontSize:14,opacity:0.8,lineHeight:1.7,marginBottom:24}}>
+          El enlace de confirmación ha expirado.<br/>
+          Introduce tu email para recibir uno nuevo.
+        </p>
+        <div style={{background:"rgba(255,255,255,0.06)",borderRadius:20,padding:24,textAlign:"left"}}>
+          <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+            placeholder="tu@email.com" style={inputStyle}
+            onKeyDown={e=>e.key==="Enter"&&handleResend()}/>
+          {error&&<div style={{fontSize:13,color:"#FCA5A5",marginBottom:10,textAlign:"center",lineHeight:1.4}}>{error}</div>}
+          <button onClick={handleResend} disabled={loading}
+            style={{...(!loading?btnStyle:btnDisabled),marginBottom:10}}>
+            {loading?"Enviando...":"Reenviar enlace →"}
+          </button>
+          <button onClick={()=>{setMode("login");setError("");}}
+            style={{...btnStyle,background:"transparent",color:"rgba(255,255,255,0.7)",border:"1px solid rgba(255,255,255,0.3)"}}>
+            Ir al login
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   if(mode==="confirm")return(
     <div style={{minHeight:"100vh",background:BG,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:28}}>

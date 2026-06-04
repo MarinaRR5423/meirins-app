@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
 
 export default function AuthScreen() {
@@ -22,7 +23,12 @@ export default function AuthScreen() {
     if (!email || !password) return setError('Completa todos los campos');
     if (password.length < 6) return setError('La contraseña debe tener al menos 6 caracteres');
     setLoading(true); setError('');
-    const { error: err } = await supabase.auth.signUp({ email, password });
+    const redirectTo = Linking.createURL('auth');
+    const { error: err } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: redirectTo },
+    });
     setLoading(false);
     if (err) setError(err.message);
     else setConfirmed(true);

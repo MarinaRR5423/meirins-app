@@ -1,48 +1,125 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
-import { PHASES, DAY_SHORT, DAY_LABELS, jsToIdx } from '../data/phases';
+import {
+  View, Text, ScrollView, TouchableOpacity,
+  TextInput, StyleSheet, ActivityIndicator, Platform,
+} from 'react-native';
+import T, { getDayLabels } from '../i18n/translations';
+import { GymSetupCard } from '../components/TabSetupCard';
+import { DAY_SHORT, DAY_LABELS, jsToIdx } from '../data/phases';
+import {
+  getSessionType,
+  SESSION_RUNNING as SESSION_RUNNING_STATIC,
+  SESSION_RENFO as SESSION_RENFO_STATIC,
+  WEEK_SCHEDULE,
+  resolveSession,
+} from '../data/marinaProgram';
+import { buildWeekPlan, PHASE_CONFIG } from '../utils/programEngine';
+import { ARTICLES } from '../data/articles';
+import TipsCard from '../components/TipsCard';
 
-const BLUE = { primary: '#1A56DB', light: '#EFF6FF', mid: 'rgba(26,86,219,0.10)' };
+const GYM_ARTICLE_IDS = ['cycle-training', 'pcos-hormones'];
+const gymArticles = ARTICLES.filter(a => GYM_ARTICLE_IDS.includes(a.id));
 
-export default function GimnasioScreen({ pi, trainDays, setTrainDays }) {
+const BLUE  = { primary: '#1A56DB', light: '#EFF6FF', mid: 'rgba(26,86,219,0.10)' };
+const GREEN = { bg: '#F0FDF4', border: '#86EFAC', text: '#16A34A' };
+const RED   = { bg: '#FEF2F2', text: '#DC2626' };
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+function fmtDate(isoString, lang = 'es') {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  return d.toLocaleDateString(
+    lang === 'fr' ? 'fr-FR' : lang === 'en' ? 'en-GB' : 'es-ES',
+    { day: 'numeric', month: 'short' },
+  );
+}
+function fmtTime(isoString) {
+  if (!isoString) return '';
+  return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+function fmtNum(n) {
+  if (n == null) return '—';
+  return n.toLocaleString();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+export default function GimnasioScreen({
+  pi, trainDays, setTrainDays, program, lang = 'es',
+  healthData, profileExtended, saveProfileExtended,
+}) {
   const [sub, setSub] = useState('hoy');
   const [extraInput, setExtraInput] = useState('');
   const [addingSport, setAddingSport] = useState(false);
-  const [editingDays, setEditingDays] = useState(false);
-  const [tempDays, setTempDays] = useState(trainDays);
   const [workoutLog, setWorkoutLog] = useState({});
+  const [completedExercises, setCompletedExercises] = useState({});
+  const [showVariations, setShowVariations] = useState(false);
+  const [expandedWeekDay, setExpandedWeekDay] = useState(null);
 
-  const d = pi?.data;
-  const todayJS = new Date();
-  const todayKey = todayJS.toISOString().split('T')[0];
-  const todayDow = todayJS.getDay();
-  const isTrainDay = trainDays.includes(todayDow);
-  const todayWeekIdx = jsToIdx[todayDow];
-  const todayWorkout = d?.week[todayWeekIdx];
-  const todayLog = workoutLog[todayKey];
+  const sessionRunning = resolveSession(program?.sessionRunning, lang, SESSION_RUNNING_STATIC);
+  const sessionRenfo   = resolveSession(program?.sessionRenfo,   lang, SESSION_RENFO_STATIC);
 
-  if (!pi) return null;
-  const saveLog = (update) => setWorkoutLog(prev => ({ ...prev, [todayKey]: update }));
+  const g  = (T[lang] || T.es).gym;
+  const cm = (T[lang] || T.es).common;
+  const hl = g.health;
 
-  const toggleTempDay = (dv) => {
-    if (tempDays.includes(dv)) { if (tempDays.length > 2) setTempDays(tempDays.filter(x => x !== dv)); }
-    else { if (tempDays.length < 6) setTempDays([...tempDays, dv].sort()); }
-  };
+  const DAY_LABELS_I18N = getDayLabels(lang);
+  const todayJS         = new Date();
+  const todayKey        = todayJS.toISOString().split('T')[0];
+  const todayDow        = todayJS.getDay();
+
+  // ── Plan personalizado (fase + trainDays + fitness + condiciones) ────────────
+  const fitnessLevel = profileExtended?.fitnessLevel || 'regular';
+  const conditions   = profileExtended?.conditions   || [];
+  const personalPlan = buildWeekPlan(pi?.phase, trainDays, fitnessLevel, conditions);
+  const todaySession = personalPlan[todayDow] ?? null;   // null = día de descanso
+  const todayLog     = workoutLog[todayKey];
+  const phaseConfig  = PHASE_CONFIG[pi?.phase] || PHASE_CONFIG.follicular;
+
+  const saveLog = (update) =>
+    setWorkoutLog(prev => ({ ...prev, [todayKey]: update }));
+
+  const toggleExercise = (idx) =>
+    setCompletedExercises(prev => ({ ...prev, [idx]: !prev[idx] }));
+
+  const completedCount  = Object.values(completedExercises).filter(Boolean).length;
+  const totalExercises  = sessionRenfo.exercises.length;
 
   const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date(); date.setDate(date.getDate() + i);
-    const dow = date.getDay();
-    const wIdx = jsToIdx[dow];
-    const cd = (((pi?.day ?? 1) - 1 + i) % (pi?.cycleLen ?? 28)) + 1;
-    const phase = cd <= 5 ? 'menstrual' : cd <= 13 ? 'follicular' : cd <= 16 ? 'ovulation' : 'luteal';
+    const date    = new Date(); date.setDate(date.getDate() + i);
+    const dow     = date.getDay();
     const dateKey = date.toISOString().split('T')[0];
-    return { date, dow, isTrain: trainDays.includes(dow), wIdx, phase, pd: PHASES[phase], log: workoutLog[dateKey], dateKey, dayNum: date.getDate(), dayLabel: i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : DAY_LABELS[dow] };
+    const session = personalPlan[dow] ?? null;
+    const sType   = session ? 'workout' : 'rest';
+    return {
+      date, dow, sessionType: sType, session,
+      log: workoutLog[dateKey], dateKey,
+      dayNum: date.getDate(),
+      dayLabel: i === 0 ? cm.today : i === 1 ? cm.tomorrow : DAY_LABELS_I18N[dow],
+    };
   });
+
+  // ── health shortcuts ────────────────────────────────────────────────────────
+  const hd        = healthData ?? {};
+  const connected = hd.isConnected;
+  const available = hd.isAvailable;
+
+  // ── workout type label + emoji ──────────────────────────────────────────────
+  const wLabel = (type) => hl?.workoutTypes?.[type] ?? type ?? '—';
+  const wEmoji = (type) => hl?.workoutEmoji?.[type] ?? '💪';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+
+      <GymSetupCard lang={lang} trainDays={trainDays} setTrainDays={setTrainDays}
+        profileExtended={profileExtended} saveProfileExtended={saveProfileExtended || (() => {})} />
+
+      {/* ── Tab bar ── */}
       <View style={styles.tabRow}>
-        {[{ id: 'hoy', l: 'Hoy' }, { id: 'semana', l: 'Semana' }].map(t => (
+        {[
+          { id: 'hoy',    l: g.today    },
+          { id: 'semana', l: g.week     },
+          { id: 'salud',  l: g.salud    },
+        ].map(t => (
           <TouchableOpacity key={t.id} onPress={() => setSub(t.id)}
             style={[styles.tab, sub === t.id && styles.tabActive]}>
             <Text style={[styles.tabText, sub === t.id && styles.tabTextActive]}>{t.l}</Text>
@@ -50,66 +127,121 @@ export default function GimnasioScreen({ pi, trainDays, setTrainDays }) {
         ))}
       </View>
 
+      {/* ════════════════════════ HOY ════════════════════════ */}
       {sub === 'hoy' && <>
-        <View style={[styles.card, { backgroundColor: BLUE.light }]}>
-          <Text style={[styles.sectionTitle, { color: BLUE.primary }]}>⚡ Fase {d?.name} · Intensidad {d?.intensity}</Text>
-          <View style={styles.intensityBar}>
-            <View style={[styles.intensityFill, { width: `${d?.intensityPct}%` }]} />
-          </View>
-          <Text style={styles.tip}>{d?.tip}</Text>
-        </View>
 
-        {isTrainDay ? <>
-          <View style={styles.card}>
-            <View style={styles.sessionHeader}>
-              <View>
-                <Text style={styles.sessionTag}>SESIÓN DE HOY</Text>
-                <Text style={styles.sessionName}>{todayWorkout?.ico} {todayWorkout?.name}</Text>
-                {todayWorkout?.dur && <Text style={styles.sessionDur}>⏱ {todayWorkout.dur}</Text>}
-              </View>
-              {todayLog && (
-                <View style={[styles.statusBadge, { backgroundColor: todayLog.status === 'done' ? '#DCFCE7' : '#FEE2E2' }]}>
-                  <Text style={[styles.statusText, { color: todayLog.status === 'done' ? '#16A34A' : '#DC2626' }]}>
-                    {todayLog.status === 'done' ? '✓ Hecho' : '✗ No pude'}
-                  </Text>
-                </View>
-              )}
+        {/* Mini health banner (last workout from HealthKit, if today) */}
+        {connected && hd.lastWorkout && hd.lastWorkout.date === todayKey && (
+          <View style={styles.healthBanner}>
+            <Text style={styles.healthBannerIco}>{wEmoji(hd.lastWorkout.type)}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.healthBannerTitle}>
+                {wLabel(hd.lastWorkout.type)} · {fmtTime(hd.lastWorkout.startTime)}
+              </Text>
+              <Text style={styles.healthBannerSub}>
+                {hd.lastWorkout.duration} {hl?.min}
+                {hd.lastWorkout.avgHR   ? `  ·  ❤️ ${hd.lastWorkout.avgHR} ${hl?.bpm}` : ''}
+                {hd.lastWorkout.calories ? `  ·  🔥 ${hd.lastWorkout.calories} kcal` : ''}
+              </Text>
             </View>
-
-            {todayWorkout?.exercises?.length > 0 && (
-              <View style={styles.exercises}>
-                <Text style={styles.exercisesLabel}>EJERCICIOS</Text>
-                {todayWorkout.exercises.map((ex, i) => (
-                  <View key={i} style={[styles.exerciseRow, { backgroundColor: i % 2 === 0 ? '#F8FAFC' : 'white' }]}>
-                    <View style={styles.exNum}><Text style={styles.exNumText}>{i + 1}</Text></View>
-                    <Text style={styles.exName}>{ex.name}</Text>
-                    <Text style={styles.exDetail}>
-                      {ex.sets && ex.reps ? `${ex.sets}×${ex.reps}` : ex.sets && ex.dur ? `${ex.sets}×${ex.dur}` : ex.dur || ''}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {!todayLog && (
-              <View style={styles.logBtns}>
-                <TouchableOpacity style={styles.doneBtn} onPress={() => saveLog({ status: 'done', extraSport: '' })}>
-                  <Text style={styles.doneBtnText}>✓ Completado</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.skipBtn} onPress={() => saveLog({ status: 'skipped', extraSport: '' })}>
-                  <Text style={styles.skipBtnText}>✗ No pude</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            {todayLog && (
-              <TouchableOpacity style={styles.undoBtn} onPress={() => setWorkoutLog(prev => { const u = { ...prev }; delete u[todayKey]; return u; })}>
-                <Text style={styles.undoBtnText}>Deshacer registro</Text>
-              </TouchableOpacity>
-            )}
+            <Text style={{ fontSize: 16 }}>✓</Text>
           </View>
+        )}
 
+        {todaySession ? <>
+          {/* Bannière de séance — compatible con datos de fase y datos legacy */}
+          {(() => {
+            const bgColor   = todaySession.phaseColor || todaySession.color   || BLUE.light;
+            const txtColor  = todaySession.textColor  || 'white';
+            const durLabel  = todaySession.dur         || todaySession.duration || '';
+            return (
+              <View style={[styles.card, { backgroundColor: bgColor }]}>
+                <View style={styles.sessionBanner}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.sessionTag, { color: txtColor, opacity: 0.8 }]}>{g.todaySession}</Text>
+                    <Text style={[styles.sessionName, { color: txtColor }]}>{todaySession.ico} {todaySession.name}</Text>
+                    {!!durLabel && <Text style={[styles.sessionDur, { color: txtColor, opacity: 0.9 }]}>⏱ {durLabel}</Text>}
+                    {/* Nota de fitness */}
+                    {todaySession.fitnessNote && (() => {
+                      const note = todaySession.fitnessNote[lang] || todaySession.fitnessNote.es || '';
+                      return note ? <Text style={styles.fitnessNote}>{note}</Text> : null;
+                    })()}
+                    {/* Nota de condición */}
+                    {todaySession.conditionNote && (() => {
+                      const note = todaySession.conditionNote[lang] || todaySession.conditionNote.es || '';
+                      return note ? <Text style={styles.conditionNote}>{note}</Text> : null;
+                    })()}
+                  </View>
+                  {todayLog && (
+                    <View style={[styles.statusBadge,
+                      { backgroundColor: todayLog.status === 'done' ? GREEN.bg : RED.bg }]}>
+                      <Text style={[styles.statusText,
+                        { color: todayLog.status === 'done' ? GREEN.text : RED.text }]}>
+                        {todayLog.status === 'done' ? g.done : g.skipped}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            );
+          })()}
+
+          {/* EJERCICIOS DEL DÍA — desde plan personalizado */}
+          {todaySession.exercises?.length > 0 && (
+            <View style={styles.card}>
+              <View style={styles.circuitHeader}>
+                <Text style={styles.sectionTitle}>
+                  {lang === 'en' ? 'Today\'s exercises' : lang === 'fr' ? 'Exercices du jour' : 'Ejercicios de hoy'}
+                </Text>
+                <Text style={styles.progressText}>
+                  {completedCount}/{todaySession.exercises.length} {g.exercises}
+                </Text>
+              </View>
+              {todaySession.exercises.map((ex, i) => {
+                const done   = !!completedExercises[i];
+                const detail = ex.sets
+                  ? `${ex.sets}×${ex.reps || ex.dur || ''}`
+                  : ex.dur || '';
+                return (
+                  <TouchableOpacity key={i} onPress={() => toggleExercise(i)}
+                    style={[styles.exRow, done && styles.exRowDone]}>
+                    <View style={[styles.exNum, done && styles.exNumDone]}>
+                      <Text style={[styles.exNumText, done && { color: 'white' }]}>{done ? '✓' : i + 1}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.exName, done && styles.exNameDone]}>{ex.name}</Text>
+                    </View>
+                    {!!detail && (
+                      <Text style={[styles.exReps, done && { color: GREEN.text }]}>{detail}</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Botones log */}
+          {!todayLog ? (
+            <View style={styles.logBtns}>
+              <TouchableOpacity style={styles.doneBtn}
+                onPress={() => saveLog({ status: 'done', extraSport: '' })}>
+                <Text style={styles.doneBtnText}>{g.sessionDone}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.skipBtn}
+                onPress={() => saveLog({ status: 'skipped', extraSport: '' })}>
+                <Text style={styles.skipBtnText}>{g.sessionSkipped}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.undoBtn}
+              onPress={() => setWorkoutLog(prev => { const u = { ...prev }; delete u[todayKey]; return u; })}>
+              <Text style={styles.undoBtnText}>{g.undo}</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Actividad extra */}
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>➕ Añadir deporte extra</Text>
+            <Text style={styles.sectionTitle}>{g.addExtra}</Text>
             {todayLog?.extraSport ? (
               <View style={styles.extraRow}>
                 <Text style={styles.extraText}>🏅 {todayLog.extraSport}</Text>
@@ -119,25 +251,32 @@ export default function GimnasioScreen({ pi, trainDays, setTrainDays }) {
               </View>
             ) : addingSport ? (
               <View style={styles.extraInput}>
-                <TextInput style={styles.input} value={extraInput} onChangeText={setExtraInput} placeholder="Ej: Tenis 1h, Pádel 90min..." />
-                <TouchableOpacity style={styles.addBtn} onPress={() => { saveLog({ ...(todayLog || { status: 'done' }), extraSport: extraInput }); setAddingSport(false); setExtraInput(''); }}>
-                  <Text style={styles.addBtnText}>Añadir</Text>
+                <TextInput style={styles.input} value={extraInput}
+                  onChangeText={setExtraInput} placeholder={g.extraPlaceholder} />
+                <TouchableOpacity style={styles.addBtn}
+                  onPress={() => {
+                    saveLog({ ...(todayLog || { status: 'done' }), extraSport: extraInput });
+                    setAddingSport(false); setExtraInput('');
+                  }}>
+                  <Text style={styles.addBtnText}>{g.add}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <TouchableOpacity style={styles.dashedBtn} onPress={() => setAddingSport(true)}>
-                <Text style={styles.dashedBtnText}>+ Añadir otro deporte o actividad</Text>
+                <Text style={styles.dashedBtnText}>{g.addActivity}</Text>
               </TouchableOpacity>
             )}
           </View>
+
         </> : <>
+          {/* Día de descanso */}
           <View style={[styles.card, { alignItems: 'center', padding: 28 }]}>
             <Text style={{ fontSize: 48, marginBottom: 12 }}>😴</Text>
-            <Text style={styles.restTitle}>Día de descanso</Text>
-            <Text style={styles.restSub}>Hoy no está programado entrenar. El descanso también es parte del progreso.</Text>
+            <Text style={styles.restTitle}>{g.restDay}</Text>
+            <Text style={styles.restSub}>{g.restDesc}</Text>
           </View>
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>¿Has hecho algo hoy? Regístralo</Text>
+            <Text style={styles.sectionTitle}>{g.restRecord}</Text>
             {todayLog?.extraSport ? (
               <View style={[styles.extraRow, { backgroundColor: BLUE.light }]}>
                 <Text style={[styles.extraText, { color: '#1E40AF' }]}>🏅 {todayLog.extraSport}</Text>
@@ -147,116 +286,416 @@ export default function GimnasioScreen({ pi, trainDays, setTrainDays }) {
               </View>
             ) : addingSport ? (
               <View style={styles.extraInput}>
-                <TextInput style={styles.input} value={extraInput} onChangeText={setExtraInput} placeholder="Ej: Paseo 30min, Natación..." />
-                <TouchableOpacity style={styles.addBtn} onPress={() => { saveLog({ status: 'extra', extraSport: extraInput }); setAddingSport(false); setExtraInput(''); }}>
-                  <Text style={styles.addBtnText}>Añadir</Text>
+                <TextInput style={styles.input} value={extraInput}
+                  onChangeText={setExtraInput} placeholder={g.extraPlaceholder} />
+                <TouchableOpacity style={styles.addBtn}
+                  onPress={() => {
+                    saveLog({ status: 'extra', extraSport: extraInput });
+                    setAddingSport(false); setExtraInput('');
+                  }}>
+                  <Text style={styles.addBtnText}>{g.add}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <TouchableOpacity style={styles.dashedBtn} onPress={() => setAddingSport(true)}>
-                <Text style={styles.dashedBtnText}>+ Añadir deporte espontáneo</Text>
+                <Text style={styles.dashedBtnText}>{g.addSpontaneous}</Text>
               </TouchableOpacity>
             )}
           </View>
         </>}
       </>}
 
+      {/* ════════════════════════ SEMANA ════════════════════════ */}
       {sub === 'semana' && <>
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>📅 Tu semana</Text>
+          <Text style={styles.sectionTitle}>{g.weekPlanning}</Text>
           {weekDays.map((day, i) => {
-            const w = d?.week[day.wIdx];
             const st = day.log?.status;
+            const s  = day.session;
+            const isExpanded = expandedWeekDay === i;
             return (
-              <View key={i} style={[styles.weekRow, { backgroundColor: i === 0 ? '#EFF6FF' : day.isTrain ? '#F8FAFC' : 'white', borderColor: i === 0 ? '#BFDBFE' : '#F1F5F9' }]}>
-                <View style={styles.weekDate}>
-                  <Text style={[styles.weekDayLabel, i === 0 && { color: BLUE.primary, fontWeight: '700' }]}>{day.dayLabel}</Text>
-                  <Text style={styles.weekDayNum}>{day.dayNum}</Text>
-                </View>
-                <Text style={{ fontSize: 20, flexShrink: 0 }}>{day.isTrain ? w?.ico : '😴'}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.weekWorkout, { color: day.isTrain ? '#1E293B' : '#CBD5E1', fontWeight: day.isTrain ? '600' : '400' }]} numberOfLines={1}>{day.isTrain ? w?.name : 'Descanso'}</Text>
-                  {day.log?.extraSport && <Text style={styles.weekExtra}>+ {day.log.extraSport}</Text>}
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  {w?.dur && day.isTrain && <Text style={styles.weekDur}>{w.dur}</Text>}
-                  {st === 'done' && <Text style={{ color: '#16A34A', fontWeight: '700' }}>✓</Text>}
-                  {st === 'skipped' && <Text style={{ color: '#EF4444', fontWeight: '700' }}>✗</Text>}
-                  {st === 'extra' && <Text style={{ color: BLUE.primary, fontWeight: '700' }}>🏅</Text>}
-                </View>
+              <View key={i}>
+                <TouchableOpacity
+                  onPress={() => s ? setExpandedWeekDay(isExpanded ? null : i) : null}
+                  activeOpacity={s ? 0.7 : 1}
+                  style={[styles.weekRow, {
+                    backgroundColor: i === 0 ? '#EFF6FF' : isExpanded ? '#F0F9FF' : s ? '#F8FAFC' : 'white',
+                    borderColor: isExpanded ? BLUE.primary : i === 0 ? '#BFDBFE' : '#F1F5F9',
+                    borderWidth: isExpanded ? 1.5 : 1,
+                  }]}>
+                  <View style={styles.weekDate}>
+                    <Text style={[styles.weekDayLabel, (i === 0 || isExpanded) && { color: BLUE.primary, fontWeight: '700' }]}>
+                      {day.dayLabel}
+                    </Text>
+                    <Text style={styles.weekDayNum}>{day.dayNum}</Text>
+                  </View>
+                  <Text style={{ fontSize: 20, flexShrink: 0 }}>{s ? s.ico : '😴'}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.weekWorkout,
+                      { color: s ? '#1E293B' : '#CBD5E1', fontWeight: s ? '600' : '400' }]}
+                      numberOfLines={1}>
+                      {s ? s.name : g.rest}
+                    </Text>
+                    {s && <Text style={styles.weekDur}>{s.duration}</Text>}
+                    {day.log?.extraSport && <Text style={styles.weekExtra}>+ {day.log.extraSport}</Text>}
+                  </View>
+                  <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                    {st === 'done'    && <Text style={{ color: GREEN.text,  fontWeight: '700', fontSize: 16 }}>✓</Text>}
+                    {st === 'skipped' && <Text style={{ color: RED.text,    fontWeight: '700', fontSize: 16 }}>✗</Text>}
+                    {st === 'extra'   && <Text style={{ fontSize: 16 }}>🏅</Text>}
+                    {s && <Text style={{ fontSize: 11, color: '#94A3B8' }}>{isExpanded ? '▲' : '▼'}</Text>}
+                  </View>
+                </TouchableOpacity>
+
+                {isExpanded && s && (
+                  <View style={[styles.weekDetail, { borderColor: BLUE.primary }]}>
+                    {s.type === 'running' && s.phases?.map((phase, pi) => (
+                      <View key={pi} style={styles.phaseRow}>
+                        <View style={[styles.phaseNum, { backgroundColor: pi === 1 ? BLUE.primary : '#F1F5F9' }]}>
+                          <Text style={[styles.phaseNumText, { color: pi === 1 ? 'white' : '#94A3B8' }]}>{pi + 1}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={styles.phaseHeader}>
+                            <Text style={styles.phaseLabel}>{phase.label}</Text>
+                            <Text style={styles.phaseDur}>{phase.duration}</Text>
+                          </View>
+                          <Text style={styles.phaseDetail}>{phase.detail}</Text>
+                        </View>
+                      </View>
+                    ))}
+                    {s.type === 'renfo' && s.exercises?.map((ex, ei) => (
+                      <View key={ei} style={styles.weekExRow}>
+                        <View style={styles.weekExNum}>
+                          <Text style={styles.weekExNumText}>{ei + 1}</Text>
+                        </View>
+                        <Text style={styles.weekExName}>{ex.name}</Text>
+                        <Text style={styles.weekExReps}>{ex.sets}×{ex.reps || ex.dur}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
             );
           })}
         </View>
 
         <View style={[styles.card, { backgroundColor: BLUE.light }]}>
-          <View style={styles.daysHeader}>
-            <Text style={[styles.sectionTitle, { color: BLUE.primary, marginBottom: 0 }]}>TUS DÍAS DE ENTRENAMIENTO</Text>
-            {!editingDays
-              ? <TouchableOpacity onPress={() => { setTempDays(trainDays); setEditingDays(true); }} style={styles.editBtn}>
-                  <Text style={styles.editBtnText}>✏️ Editar</Text>
-                </TouchableOpacity>
-              : <View style={{ flexDirection: 'row', gap: 6 }}>
-                  <TouchableOpacity onPress={() => setEditingDays(false)} style={styles.cancelBtn}>
-                    <Text style={styles.cancelBtnText}>Cancelar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => { setTrainDays(tempDays); setEditingDays(false); }} style={styles.saveBtn}>
-                    <Text style={styles.saveBtnText}>Guardar</Text>
-                  </TouchableOpacity>
-                </View>
-            }
-          </View>
-          <View style={styles.daysRow}>
-            {[0, 1, 2, 3, 4, 5, 6].map(dv => {
-              const active = editingDays ? tempDays.includes(dv) : trainDays.includes(dv);
-              return (
-                <TouchableOpacity key={dv} onPress={() => editingDays && toggleTempDay(dv)}
-                  style={[styles.dayChip, { backgroundColor: active ? BLUE.primary : '#E2E8F0' }]}>
-                  <Text style={[styles.dayChipText, { color: active ? 'white' : '#94A3B8' }]}>{DAY_SHORT[dv]}</Text>
-                  <Text style={{ fontSize: 12 }}>{active ? '💪' : '😴'}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          {editingDays && <Text style={styles.daysHint}>Toca para activar/desactivar · mín. 2, máx. 6</Text>}
+          <Text style={[styles.sectionTitle, { color: BLUE.primary }]}>{g.myProgram}</Text>
+          {g.programRows.map((row, i) => (
+            <View key={i} style={styles.progRow}>
+              <Text style={{ fontSize: 22, flexShrink: 0 }}>{row.ico}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.progLabel}>{row.label}</Text>
+                <Text style={styles.progDetail}>{row.detail}</Text>
+              </View>
+            </View>
+          ))}
         </View>
       </>}
+
+      {/* ════════════════════════ SALUD ════════════════════════ */}
+      {sub === 'salud' && (
+        <HealthTab
+          hl={hl}
+          hd={hd}
+          lang={lang}
+          wLabel={wLabel}
+          wEmoji={wEmoji}
+        />
+      )}
+
+      {/* Consejos */}
+      <TipsCard articles={gymArticles} lang={lang} />
+
     </ScrollView>
   );
 }
 
+// ─── Health tab ───────────────────────────────────────────────────────────────
+function HealthTab({ hl, hd, lang, wLabel, wEmoji }) {
+  const {
+    isAvailable, isConnected, isLoading, lastSync,
+    lastWorkout, recentWorkouts, todayMetrics, lastSleep,
+    requestPermissions, syncData, disconnect,
+  } = hd;
+
+  // ── Connection card ────────────────────────────────────────────────────────
+  const ConnectCard = () => {
+    if (!isAvailable) {
+      return (
+        <View style={[styles.card, { alignItems: 'center', paddingVertical: 28 }]}>
+          <Text style={{ fontSize: 36, marginBottom: 10 }}>📵</Text>
+          <Text style={styles.sectionTitle}>{hl?.title}</Text>
+          <Text style={[styles.tipText, { textAlign: 'center', marginTop: 4 }]}>
+            {hl?.notAvailable}
+          </Text>
+        </View>
+      );
+    }
+    if (isConnected) {
+      return (
+        <View style={[styles.card, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
+          <View style={styles.connectedDot} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sectionTitle}>{hl?.title}</Text>
+            <Text style={styles.connectedLabel}>
+              {hl?.connectedTo} · {Platform.OS === 'ios' ? 'Apple Health' : 'Health Connect'}
+            </Text>
+            {lastSync && (
+              <Text style={styles.lastSyncText}>
+                {hl?.lastSync}: {new Date(lastSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            )}
+          </View>
+          <View style={{ gap: 8, alignItems: 'flex-end' }}>
+            <TouchableOpacity style={styles.syncBtn} onPress={syncData} disabled={isLoading}>
+              {isLoading
+                ? <ActivityIndicator size="small" color={BLUE.primary} />
+                : <Text style={styles.syncBtnText}>{hl?.sync}</Text>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity onPress={disconnect}>
+              <Text style={styles.disconnectText}>{hl?.disconnect}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+    return (
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>{hl?.title}</Text>
+        <Text style={[styles.tipText, { marginBottom: 16 }]}>{hl?.permissionsInfo}</Text>
+        <TouchableOpacity style={styles.connectBtn} onPress={requestPermissions}>
+          <Text style={styles.connectBtnText}>
+            {Platform.OS === 'ios' ? hl?.connectIos : hl?.connectAndroid}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // ── Last workout card ──────────────────────────────────────────────────────
+  const LastWorkoutCard = () => {
+    if (!isConnected) return null;
+    if (!lastWorkout) {
+      return (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>{hl?.lastSession}</Text>
+          <Text style={styles.tipText}>{hl?.noSession}</Text>
+        </View>
+      );
+    }
+    const w = lastWorkout;
+    return (
+      <View style={styles.card}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+          <Text style={styles.sectionTitle}>{hl?.lastSession}</Text>
+          <Text style={styles.dateChip}>{fmtDate(w.startTime, lang)}</Text>
+        </View>
+
+        {/* Header */}
+        <View style={styles.workoutHeader}>
+          <Text style={{ fontSize: 36 }}>{wEmoji(w.type)}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.workoutName}>{wLabel(w.type)}</Text>
+            <Text style={styles.workoutTime}>
+              {fmtTime(w.startTime)}{w.endTime ? ` → ${fmtTime(w.endTime)}` : ''}
+            </Text>
+          </View>
+        </View>
+
+        {/* Metric pills */}
+        <View style={styles.metricRow}>
+          <MetricPill icon="⏱" label={hl?.duration} value={w.duration != null ? `${w.duration} ${hl?.min}` : '—'} />
+          {w.avgHR     != null && <MetricPill icon="❤️" label={hl?.avgHR}    value={`${w.avgHR} ${hl?.bpm}`}  color="#EF4444" />}
+          {w.maxHR     != null && <MetricPill icon="🔺" label={hl?.maxHR}    value={`${w.maxHR} ${hl?.bpm}`}  color="#EF4444" />}
+          {w.calories  != null && <MetricPill icon="🔥" label={hl?.calories} value={`${w.calories} kcal`}     color="#F97316" />}
+          {w.distance  != null && <MetricPill icon="📍" label={hl?.distance} value={`${w.distance} ${hl?.km}`} color="#8B5CF6" />}
+        </View>
+      </View>
+    );
+  };
+
+  // ── Recent workouts list ───────────────────────────────────────────────────
+  const RecentWorkoutsCard = () => {
+    if (!isConnected || !recentWorkouts?.length || recentWorkouts.length < 2) return null;
+    const rest = recentWorkouts.slice(1, 7); // skip first (already shown as lastWorkout)
+    return (
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>{hl?.recentSessions}</Text>
+        {rest.map((w, i) => (
+          <View key={i} style={styles.recentRow}>
+            <Text style={{ fontSize: 22, flexShrink: 0 }}>{wEmoji(w.type)}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.recentName}>{wLabel(w.type)}</Text>
+              <Text style={styles.recentDate}>{fmtDate(w.startTime, lang)}  ·  {fmtTime(w.startTime)}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={styles.recentDur}>{w.duration} {hl?.min}</Text>
+              {w.calories != null && (
+                <Text style={styles.recentCal}>🔥 {w.calories}</Text>
+              )}
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  // ── Today's metrics ────────────────────────────────────────────────────────
+  const MetricsCard = () => {
+    if (!isConnected) return null;
+    const m = todayMetrics;
+    return (
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>{hl?.metrics}</Text>
+        {!m ? (
+          <Text style={styles.tipText}>{hl?.noMetrics}</Text>
+        ) : (
+          <View style={styles.metricsGrid}>
+            {m.steps          != null && <BigMetric icon="👣" label={hl?.steps}          value={fmtNum(m.steps)} />}
+            {m.activeCalories != null && <BigMetric icon="🔥" label={hl?.activeCalories} value={`${fmtNum(m.activeCalories)} kcal`} />}
+            {m.restingHR      != null && <BigMetric icon="❤️" label={hl?.restingHR}      value={`${m.restingHR} ${hl?.bpm}`} color="#EF4444" />}
+            {m.hrv            != null && <BigMetric icon="📈" label={hl?.hrv}            value={`${m.hrv} ms`}              color="#8B5CF6" />}
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  // ── Last sleep ─────────────────────────────────────────────────────────────
+  const SleepCard = () => {
+    if (!isConnected) return null;
+    const s = lastSleep;
+    return (
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>{hl?.sleepTitle}</Text>
+        {!s ? (
+          <Text style={styles.tipText}>{hl?.noSleep}</Text>
+        ) : (
+          <>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginBottom: 12 }}>
+              <Text style={styles.sleepHours}>{s.duration}</Text>
+              <Text style={styles.sleepUnit}>h</Text>
+              {s.date && <Text style={styles.sleepDate}> · {fmtDate(s.date + 'T00:00:00', lang)}</Text>}
+            </View>
+            <View style={styles.metricRow}>
+              {s.deepSleep > 0 && <MetricPill icon="🌑" label={hl?.deepSleep} value={`${s.deepSleep} h`} color="#4F46E5" />}
+              {s.remSleep  > 0 && <MetricPill icon="🌙" label={hl?.remSleep}  value={`${s.remSleep} h`}  color="#7C3AED" />}
+              {s.inBed     > 0 && <MetricPill icon="🛏"  label={hl?.inBed}    value={`${s.inBed} h`}     color="#64748B" />}
+            </View>
+          </>
+        )}
+      </View>
+    );
+  };
+
+  return (
+    <>
+      <ConnectCard />
+      <LastWorkoutCard />
+      <RecentWorkoutsCard />
+      <MetricsCard />
+      <SleepCard />
+    </>
+  );
+}
+
+// ─── Small UI components ──────────────────────────────────────────────────────
+function MetricPill({ icon, label, value, color = BLUE.primary }) {
+  return (
+    <View style={[styles.pill, { borderColor: color + '33', backgroundColor: color + '0D' }]}>
+      <Text style={{ fontSize: 14 }}>{icon}</Text>
+      <View>
+        <Text style={[styles.pillLabel, { color }]}>{label}</Text>
+        <Text style={[styles.pillValue, { color }]}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
+function BigMetric({ icon, label, value, color = BLUE.primary }) {
+  return (
+    <View style={styles.bigMetric}>
+      <Text style={{ fontSize: 28, marginBottom: 4 }}>{icon}</Text>
+      <Text style={[styles.bigMetricValue, { color }]}>{value}</Text>
+      <Text style={styles.bigMetricLabel}>{label}</Text>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F0F4FA' },
   content: { padding: 14, paddingTop: 60, paddingBottom: 30 },
+
+  // tabs
   tabRow: { flexDirection: 'row', backgroundColor: 'white', borderRadius: 50, padding: 4, marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   tab: { flex: 1, paddingVertical: 9, borderRadius: 46, alignItems: 'center' },
   tabActive: { backgroundColor: '#1A56DB' },
-  tabText: { fontSize: 13, color: '#94A3B8' },
+  tabText: { fontSize: 12, color: '#94A3B8' },
   tabTextActive: { color: 'white', fontWeight: '700' },
+
+  // cards
   card: { backgroundColor: 'white', borderRadius: 18, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   sectionTitle: { fontSize: 14, fontWeight: '600', color: '#1E293B', marginBottom: 10 },
-  intensityBar: { height: 8, backgroundColor: '#DBEAFE', borderRadius: 4, marginBottom: 8, overflow: 'hidden' },
-  intensityFill: { height: '100%', backgroundColor: '#1A56DB', borderRadius: 4 },
-  tip: { fontSize: 12, color: '#475569', fontStyle: 'italic' },
-  sessionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
-  sessionTag: { fontSize: 11, color: '#1A56DB', fontWeight: '700', letterSpacing: 0.8, marginBottom: 4 },
-  sessionName: { fontSize: 18, fontWeight: '700', color: '#1E293B' },
-  sessionDur: { fontSize: 13, color: '#64748B', marginTop: 2 },
+
+  // health banner (mini, on top of hoy)
+  healthBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F0FDF4', borderRadius: 14, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#86EFAC' },
+  healthBannerIco: { fontSize: 28 },
+  healthBannerTitle: { fontSize: 13, fontWeight: '700', color: '#166534' },
+  healthBannerSub: { fontSize: 12, color: '#4ADE80', marginTop: 2 },
+
+  // session
+  sessionBanner:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  sessionTag:     { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, marginBottom: 4 },
+  sessionName:    { fontSize: 20, fontWeight: '700', marginBottom: 2 },
+  fitnessNote:    { fontSize: 12, color: 'rgba(255,255,255,0.9)', backgroundColor: 'rgba(0,0,0,0.15)', borderRadius: 8, padding: 8, marginTop: 8, lineHeight: 18 },
+  conditionNote:  { fontSize: 12, color: 'rgba(255,255,255,0.9)', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 8, marginTop: 6, lineHeight: 18 },
+  sessionDur: { fontSize: 13, opacity: 0.8 },
   statusBadge: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, flexShrink: 0 },
   statusText: { fontSize: 12, fontWeight: '700' },
-  exercises: { marginBottom: 14 },
-  exercisesLabel: { fontSize: 11, fontWeight: '700', color: '#94A3B8', marginBottom: 8, letterSpacing: 0.5 },
-  exerciseRow: { flexDirection: 'row', alignItems: 'center', padding: 9, borderRadius: 10, marginBottom: 4 },
-  exNum: { width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(26,86,219,0.10)', justifyContent: 'center', alignItems: 'center', marginRight: 10, flexShrink: 0 },
-  exNumText: { fontSize: 11, fontWeight: '700', color: '#1A56DB' },
-  exName: { flex: 1, fontSize: 13, fontWeight: '500', color: '#1E293B' },
-  exDetail: { fontSize: 12, color: '#1A56DB', fontWeight: '600', flexShrink: 0, marginLeft: 8 },
-  logBtns: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  doneBtn: { flex: 1, padding: 12, borderRadius: 12, backgroundColor: '#16A34A', alignItems: 'center' },
+
+  // circuit
+  circuitHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  progressText: { fontSize: 12, color: '#1A56DB', fontWeight: '600' },
+  warmupRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#FEF3C7', borderRadius: 12, padding: 10, marginBottom: 10 },
+  warmupIco: { fontSize: 18 },
+  warmupLabel: { fontSize: 12, fontWeight: '700', color: '#92400E', marginBottom: 2 },
+  warmupDetail: { fontSize: 12, color: '#78350F' },
+  exRow: { flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#F1F5F9', marginBottom: 6, gap: 10 },
+  exRowDone: { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' },
+  exNum: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  exNumDone: { backgroundColor: '#16A34A' },
+  exNumText: { fontSize: 12, fontWeight: '700', color: '#1A56DB' },
+  exName: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
+  exNameDone: { color: '#16A34A', textDecorationLine: 'line-through' },
+  exDetail: { fontSize: 11, color: '#94A3B8', marginTop: 1 },
+  exReps: { fontSize: 13, fontWeight: '700', color: '#1A56DB', flexShrink: 0 },
+  restRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
+  restIco: { fontSize: 16 },
+  restText: { fontSize: 13, color: '#64748B' },
+  variationBtn: { marginTop: 10, padding: 10, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#1A56DB', alignItems: 'center' },
+  variationBtnText: { color: '#1A56DB', fontWeight: '600', fontSize: 13 },
+  variationBox: { marginTop: 8, backgroundColor: '#F0FDF4', borderRadius: 12, padding: 12 },
+  tipBox: { marginTop: 12, backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12 },
+  tipTitle: { fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 },
+  tipText: { fontSize: 12, color: '#64748B', lineHeight: 20 },
+  phaseRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
+  phaseNum: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  phaseNumText: { fontSize: 12, fontWeight: '700' },
+  phaseHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+  phaseLabel: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
+  phaseDur: { fontSize: 12, color: '#1A56DB', fontWeight: '600' },
+  phaseDetail: { fontSize: 12, color: '#64748B', lineHeight: 18 },
+
+  // log buttons
+  logBtns: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  doneBtn: { flex: 1, padding: 14, borderRadius: 14, backgroundColor: '#16A34A', alignItems: 'center' },
   doneBtnText: { color: 'white', fontWeight: '700', fontSize: 14 },
-  skipBtn: { flex: 1, padding: 12, borderRadius: 12, backgroundColor: '#EF4444', alignItems: 'center' },
+  skipBtn: { flex: 1, padding: 14, borderRadius: 14, backgroundColor: '#EF4444', alignItems: 'center' },
   skipBtnText: { color: 'white', fontWeight: '700', fontSize: 14 },
-  undoBtn: { padding: 9, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', marginBottom: 8 },
+  undoBtn: { padding: 10, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: 'white', alignItems: 'center', marginBottom: 12 },
   undoBtnText: { fontSize: 13, color: '#64748B' },
   extraRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10, backgroundColor: '#F0FDF4', borderRadius: 10 },
   extraText: { fontSize: 13, color: '#166534', fontWeight: '500' },
@@ -269,22 +708,60 @@ const styles = StyleSheet.create({
   dashedBtnText: { fontSize: 13, color: '#64748B' },
   restTitle: { fontSize: 16, fontWeight: '700', color: '#1E293B', marginBottom: 8 },
   restSub: { fontSize: 13, color: '#64748B', lineHeight: 20, textAlign: 'center' },
+
+  // week
   weekRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, borderWidth: 1, marginBottom: 6 },
-  weekDate: { width: 40, alignItems: 'center', flexShrink: 0 },
+  weekDate: { width: 60, alignItems: 'center', flexShrink: 0 },
   weekDayLabel: { fontSize: 10, color: '#94A3B8' },
   weekDayNum: { fontSize: 18, fontWeight: '700', color: '#1E293B', lineHeight: 22 },
   weekWorkout: { fontSize: 13 },
+  weekDur: { fontSize: 11, color: '#94A3B8' },
   weekExtra: { fontSize: 11, color: '#1A56DB', marginTop: 1 },
-  weekDur: { fontSize: 10, color: '#94A3B8' },
-  daysHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  editBtn: { borderWidth: 1, borderColor: '#1A56DB', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 3 },
-  editBtnText: { fontSize: 12, color: '#1A56DB' },
-  cancelBtn: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
-  cancelBtnText: { fontSize: 12, color: '#64748B' },
-  saveBtn: { backgroundColor: '#1A56DB', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 3 },
-  saveBtnText: { fontSize: 12, color: 'white', fontWeight: '600' },
-  daysRow: { flexDirection: 'row', gap: 5, marginTop: 4 },
-  dayChip: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center', gap: 3 },
-  dayChipText: { fontSize: 11, fontWeight: '600' },
-  daysHint: { fontSize: 11, color: '#1A56DB', marginTop: 8, textAlign: 'center' },
+  progRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(26,86,219,0.08)' },
+  progLabel: { fontSize: 13, fontWeight: '600', color: '#1E293B' },
+  progDetail: { fontSize: 12, color: '#475569', marginTop: 1 },
+  weekDetail: { marginTop: -4, marginBottom: 6, backgroundColor: '#F8FBFF', borderWidth: 1.5, borderTopWidth: 0, borderColor: '#1A56DB', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, padding: 12, gap: 6 },
+  weekExRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#EFF6FF' },
+  weekExNum: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  weekExNumText: { fontSize: 11, fontWeight: '700', color: '#1A56DB' },
+  weekExName: { flex: 1, fontSize: 13, color: '#1E293B', fontWeight: '500' },
+  weekExReps: { fontSize: 12, fontWeight: '700', color: '#1A56DB' },
+
+  // health tab — connection
+  connectedDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#16A34A', flexShrink: 0 },
+  connectedLabel: { fontSize: 12, color: '#16A34A', fontWeight: '600', marginTop: 2 },
+  lastSyncText: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
+  syncBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: BLUE.light, borderWidth: 1, borderColor: '#BFDBFE' },
+  syncBtnText: { fontSize: 12, color: BLUE.primary, fontWeight: '600' },
+  disconnectText: { fontSize: 11, color: '#94A3B8', textDecorationLine: 'underline' },
+  connectBtn: { backgroundColor: BLUE.primary, borderRadius: 14, padding: 14, alignItems: 'center' },
+  connectBtnText: { color: 'white', fontWeight: '700', fontSize: 14 },
+
+  // health tab — last workout
+  dateChip: { fontSize: 11, color: '#94A3B8', backgroundColor: '#F1F5F9', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, alignSelf: 'flex-start' },
+  workoutHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
+  workoutName: { fontSize: 18, fontWeight: '700', color: '#1E293B' },
+  workoutTime: { fontSize: 12, color: '#64748B', marginTop: 2 },
+  metricRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
+  pillLabel: { fontSize: 9, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
+  pillValue: { fontSize: 13, fontWeight: '700' },
+
+  // health tab — recent workouts
+  recentRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  recentName: { fontSize: 13, fontWeight: '600', color: '#1E293B' },
+  recentDate: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
+  recentDur: { fontSize: 13, fontWeight: '700', color: BLUE.primary },
+  recentCal: { fontSize: 11, color: '#F97316', marginTop: 2 },
+
+  // health tab — metrics grid
+  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  bigMetric: { flex: 1, minWidth: '40%', backgroundColor: '#F8FAFC', borderRadius: 14, padding: 14, alignItems: 'center' },
+  bigMetricValue: { fontSize: 20, fontWeight: '700', marginBottom: 2 },
+  bigMetricLabel: { fontSize: 11, color: '#94A3B8', fontWeight: '500' },
+
+  // health tab — sleep
+  sleepHours: { fontSize: 42, fontWeight: '700', color: '#4F46E5' },
+  sleepUnit: { fontSize: 20, color: '#4F46E5', fontWeight: '600' },
+  sleepDate: { fontSize: 12, color: '#94A3B8' },
 });

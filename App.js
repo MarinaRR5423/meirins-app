@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text, View, ActivityIndicator } from 'react-native';
+import { Text, View, ActivityIndicator, Platform } from 'react-native';
+import * as Linking from 'expo-linking';
+import * as Localization from 'expo-localization';
 import { useProfile } from './src/hooks/useProfile';
+import { supabase } from './src/lib/supabase';
+import T from './src/i18n/translations';
 import { getPhaseInfo } from './src/data/phases';
 import AuthScreen from './src/components/AuthScreen';
 import SetupScreen from './src/components/SetupScreen';
@@ -11,13 +15,106 @@ import CicloScreen from './src/screens/CicloScreen';
 import NutriScreen from './src/screens/NutriScreen';
 import GimnasioScreen from './src/screens/GimnasioScreen';
 import PerfilScreen from './src/screens/IAScreen';
+import { useHealthData } from './src/hooks/useHealthData';
 
 const Tab = createBottomTabNavigator();
 
+// ─── Detectar idioma del dispositivo ──────────────────────────────────────────
+// Mapea el locale del sistema (ej: 'fr-FR', 'en-US', 'es-ES') a uno de los
+// 3 idiomas soportados. Si no hay coincidencia, usa inglés por defecto.
+function getDeviceLang() {
+  const supported = ['es', 'en', 'fr', 'it'];
+  const locales = Localization.getLocales?.() ?? [];
+  for (const locale of locales) {
+    const code = locale.languageCode?.toLowerCase();
+    if (supported.includes(code)) return code;
+  }
+  return 'en';
+}
+
+// ─── Handle email confirmation deep link ───────────────────────────────────────
+async function handleAuthUrl(url) {
+  if (!url) return;
+  try {
+    // PKCE flow: meirins://auth?code=xxx
+    const codeMatch = url.match(/[?&]code=([^&]+)/);
+    if (codeMatch) {
+      await supabase.auth.exchangeCodeForSession(codeMatch[1]);
+      return;
+    }
+    // Token hash flow: meirins://auth#access_token=xxx&refresh_token=xxx
+    const hashMatch = url.match(/#(.*)/);
+    if (hashMatch) {
+      const params = {};
+      hashMatch[1].split('&').forEach(p => {
+        const [k, v] = p.split('=');
+        params[k] = v;
+      });
+      if (params.access_token && params.refresh_token) {
+        await supabase.auth.setSession({
+          access_token: params.access_token,
+          refresh_token: params.refresh_token,
+        });
+      }
+    }
+  } catch (e) {
+    console.log('Auth URL error:', e);
+  }
+}
+
+// ─── Banner de sin conexión ────────────────────────────────────────────────────
+function OfflineBanner({ lang }) {
+  const msg = {
+    es: '📡 Sin conexión — mostrando datos en caché',
+    en: '📡 Offline — showing cached data',
+    fr: '📡 Hors ligne — affichage des données en cache',
+    it: '📡 Offline — visualizzazione dati in cache',
+  };
+  return (
+    <View style={{ backgroundColor: '#FEF3C7', paddingVertical: 6, paddingHorizontal: 16, alignItems: 'center' }}>
+      <Text style={{ fontSize: 12, color: '#92400E', fontWeight: '500' }}>{msg[lang] || msg.es}</Text>
+    </View>
+  );
+}
+
 export default function App() {
-  const profile = useProfile();
+  const profile    = useProfile();
+  const healthData = useHealthData();
+  const [setupLang, setSetupLang] = React.useState(getDeviceLang);
+  const [isOffline, setIsOffline] = useState(false);
+
+  // Deep link listener (email confirmation)
+  useEffect(() => {
+    const sub = Linking.addEventListener('url', ({ url }) => handleAuthUrl(url));
+    Linking.getInitialURL().then(url => handleAuthUrl(url));
+    return () => sub.remove();
+  }, []);
+
+  // Detector de conexión — ping ligero a Supabase cada 30s
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const check = async () => {
+      try {
+        await supabase.from('profiles').select('id').limit(1).maybeSingle();
+        setIsOffline(false);
+      } catch {
+        setIsOffline(true);
+      }
+    };
+    check();
+    const interval = setInterval(check, 30000);
+    return () => clearInterval(interval);
+  }, []);
   const { authState, profileLoaded, setupDone, lastPeriod, cycleLength } = profile;
-  const pi = lastPeriod ? getPhaseInfo(lastPeriod, cycleLength) : null;
+  const lang = profile.profileExtended?.language || 'es';
+  const tabs = (T[lang] || T.es).tabs;
+  const { periodEnd, sleepLog, programContent } = profile;
+  const pi = lastPeriod ? getPhaseInfo(lastPeriod, cycleLength, periodEnd) : null;
+
+  // Pick the right language column from program_content table, fall back to ES
+  const programData = programContent
+    ? (programContent[`data_${lang}`] ?? programContent.data_es ?? null)
+    : null;
 
   if (authState === 'loading' || (authState === 'authenticated' && !profileLoaded)) {
     return (
@@ -29,10 +126,11 @@ export default function App() {
   }
 
   if (authState === 'unauthenticated') return <AuthScreen />;
-  if (!setupDone) return <SetupScreen onDone={profile.handleSetupDone} />;
+  if (!setupDone) return <SetupScreen onDone={profile.handleSetupDone} lang={setupLang} onLangChange={setSetupLang} />;
 
   return (
     <NavigationContainer>
+      {isOffline && <OfflineBanner lang={lang} />}
       <Tab.Navigator
         screenOptions={{
           headerShown: false,
@@ -41,25 +139,30 @@ export default function App() {
           tabBarInactiveTintColor: '#94A3B8',
           tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
         }}>
-        <Tab.Screen name="Inicio" options={{ tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏠</Text> }}>
-          {() => <HomeScreen pi={pi} profile={{
-    age: profile.age,
-    weight: profile.weight,
-    height: profile.height,
-    activityLevel: profile.activityLevel,
-    goal: profile.goal,
-  }} />}
+        <Tab.Screen name="Inicio" options={{ tabBarLabel: tabs.home, tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏠</Text> }}>
+          {() => <HomeScreen lang={lang} pi={pi} profile={{
+            age: profile.age, weight: profile.weight, height: profile.height,
+            activityLevel: profile.activityLevel, goal: profile.goal,
+            trainDays: profile.trainDays,
+            profileExtended: profile.profileExtended,
+          }} />}
         </Tab.Screen>
-        <Tab.Screen name="Ciclo" options={{ tabBarIcon: () => <Text style={{ fontSize: 20 }}>🌙</Text> }}>
-          {() => <CicloScreen pi={pi} setLastPeriod={profile.setLastPeriod} setCycleLength={profile.setCycleLength} />}
+        <Tab.Screen name="Ciclo" options={{ tabBarLabel: tabs.cycle, tabBarIcon: () => <Text style={{ fontSize: 20 }}>🌙</Text> }}>
+          {() => <CicloScreen lang={lang} pi={pi} lastPeriod={lastPeriod} setLastPeriod={profile.setLastPeriod} setCycleLength={profile.setCycleLength} periodEnd={periodEnd} setPeriodEnd={profile.setPeriodEnd} sleepLog={sleepLog} logSleep={profile.logSleep} profileExtended={profile.profileExtended} saveProfileExtended={profile.saveProfileExtended} />}
         </Tab.Screen>
-        <Tab.Screen name="Nutrición" options={{ tabBarIcon: () => <Text style={{ fontSize: 20 }}>🥗</Text> }}>
-          {() => <NutriScreen pi={pi} />}
+        <Tab.Screen name="Nutrición" options={{ tabBarLabel: tabs.nutri, tabBarIcon: () => <Text style={{ fontSize: 20 }}>🥗</Text> }}>
+          {() => <NutriScreen lang={lang} pi={pi} program={programData}
+            goal={profile.goal} activityLevel={profile.activityLevel} dietary={profile.dietary}
+            profileExtended={profile.profileExtended}
+            age={profile.age} weight={profile.weight} height={profile.height}
+            trainDays={profile.trainDays}
+            saveAll={profile.saveAll} saveProfileExtended={profile.saveProfileExtended} />}
         </Tab.Screen>
-        <Tab.Screen name="Gimnasio" options={{ tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏋️</Text> }}>
-          {() => <GimnasioScreen pi={pi} trainDays={profile.trainDays} setTrainDays={profile.setTrainDays} />}
+        <Tab.Screen name="Gimnasio" options={{ tabBarLabel: tabs.gym, tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏋️</Text> }}>
+          {() => <GimnasioScreen lang={lang} pi={pi} trainDays={profile.trainDays} setTrainDays={profile.setTrainDays} program={programData} healthData={healthData}
+            profileExtended={profile.profileExtended} saveProfileExtended={profile.saveProfileExtended} />}
         </Tab.Screen>
-        <Tab.Screen name="Perfil" options={{ tabBarIcon: () => <Text style={{ fontSize: 20 }}>👤</Text> }}>
+        <Tab.Screen name="Perfil" options={{ tabBarLabel: tabs.profile, tabBarIcon: () => <Text style={{ fontSize: 20 }}>👤</Text> }}>
           {() => <PerfilScreen pi={pi} profile={{
             age: profile.age,
             weight: profile.weight,
@@ -69,6 +172,9 @@ export default function App() {
             dietary: profile.dietary,
             trainDays: profile.trainDays,
             saveAll: profile.saveAll,
+            profileExtended: profile.profileExtended,
+            saveProfileExtended: profile.saveProfileExtended,
+            logWeight: profile.logWeight,
           }} signOut={profile.signOut} />}
         </Tab.Screen>
       </Tab.Navigator>

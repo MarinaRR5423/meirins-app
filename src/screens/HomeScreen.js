@@ -2,48 +2,77 @@ import React from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { PHASES } from '../data/phases';
+import { usePhaseData } from '../hooks/usePhaseData';
+import T, { getPhaseDisplay, getMealLabel } from '../i18n/translations';
+import { calcCalories } from '../utils/calories';
+import { getTodayWorkout } from '../utils/programEngine';
+import EmptyState from '../components/EmptyState';
 
 const BLUE = { primary: '#1A56DB', light: '#EFF6FF', mid: 'rgba(26,86,219,0.10)' };
-function calcCalories(profile, phase) {
-  if (!profile?.weight || !profile?.height || !profile?.age) return null;
-  const bmr = 10 * profile.weight + 6.25 * profile.height - 5 * profile.age - 161;
-  const actMap = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
-  const act = actMap[profile.activityLevel] || 1.55;
-  const tdee = Math.round(bmr * act);
-  const goalMap = { lose: -300, maintain: 0, gain: 300 };
-  const adj = goalMap[profile.goal] || 0;
-  const phaseAdj = { menstrual: -200, follicular: -300, ovulation: -250, luteal: 100 };
-  const total = tdee + adj + (phaseAdj[phase] || 0);
-  return { tdee, total: Math.max(1200, total) };
-}
-export default function HomeScreen({ pi, profile }) {
-  const d = pi?.data;
+export default function HomeScreen({ pi, profile, lang = 'es' }) {
+  const { phaseData } = usePhaseData(pi?.phase, lang);
+  const baseD = phaseData;
+  const d = baseD ? getPhaseDisplay(lang, pi?.phase, baseD) : null;
   const navigation = useNavigation();
   const cals = calcCalories(profile, pi?.phase);
+
+  // Sesión de hoy personalizada (fase + trainDays + fitnessLevel + condiciones)
+  const todaySession = getTodayWorkout(
+    pi?.phase,
+    profile?.trainDays || [],
+    profile?.profileExtended?.fitnessLevel || 'regular',
+    profile?.profileExtended?.conditions   || [],
+  );
   const pKeys = ['menstrual', 'follicular', 'ovulation', 'luteal'];
   const pR = { menstrual: [1, 5], follicular: [6, 13], ovulation: [14, 16], luteal: [17, pi?.cycleLen || 28] };
+  const h = (T[lang] || T.es).home;
+  const c = (T[lang] || T.es).common;
+
+  // Empty state — sin datos de ciclo
+  if (!pi) {
+    const emptyTxt = {
+      title:    { es: 'Registra tu primer ciclo', en: 'Log your first cycle', fr: 'Enregistre ton premier cycle', it: 'Registra il tuo primo ciclo' },
+      subtitle: { es: 'Ve a la pestaña Ciclo para introducir la fecha de tu último período y desbloquear todo tu programa personalizado.', en: 'Go to the Cycle tab to enter your last period date and unlock your personalised programme.', fr: 'Va dans l\'onglet Cycle pour saisir ta dernière date de règles et débloquer ton programme.', it: 'Vai alla scheda Ciclo per inserire la data dell\'ultimo periodo e sbloccare il tuo programma.' },
+      cta:      { es: 'Ir a Ciclo →', en: 'Go to Cycle →', fr: 'Aller au Cycle →', it: 'Vai al Ciclo →' },
+    };
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerSub}>Meirins</Text>
+          <Text style={styles.headerTitle}>👋 {h.today}</Text>
+        </View>
+        <EmptyState
+          emoji="🌙"
+          title={emptyTxt.title[lang] || emptyTxt.title.es}
+          subtitle={emptyTxt.subtitle[lang] || emptyTxt.subtitle.es}
+          ctaLabel={emptyTxt.cta[lang] || emptyTxt.cta.es}
+          onCta={() => navigation.navigate('Ciclo')}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerSub}>Meirins · hoy</Text>
-          <Text style={styles.headerTitle}>{d?.emoji} Fase {d?.name}</Text>
+          <Text style={styles.headerSub}>Meirins · {h.today}</Text>
+          <Text style={styles.headerTitle}>{d?.emoji} {h.phase} {d?.name}</Text>
         </View>
         <View style={styles.dayBadge}>
           <Text style={styles.dayNum}>{pi?.day}</Text>
-          <Text style={styles.dayLabel}>DÍA DEL CICLO</Text>
+          <Text style={styles.dayLabel}>{h.cycleDay}</Text>
         </View>
       </View>
       <View style={styles.headerTag}>
-        <Text style={styles.headerTagText}>{d?.tagline} · Quedan <Text style={{ fontWeight: '700' }}>{pi?.daysLeft} días</Text></Text>
+        <Text style={styles.headerTagText}>{d?.tagline} · {h.remaining} <Text style={{ fontWeight: '700' }}>{pi?.daysLeft} {h.daysLeft}</Text></Text>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 14, paddingBottom: 30 }}>
         <View style={styles.card}>
           <View style={styles.cardRow}>
-            <Text style={styles.cardLabel}>Tu ciclo</Text>
-            <Text style={styles.cardMuted}>Día {pi?.day} de {pi?.cycleLen}</Text>
+            <Text style={styles.cardLabel}>{h.yourCycle}</Text>
+            <Text style={styles.cardMuted}>{h.dayOf} {pi?.day} {h.of} {pi?.cycleLen}</Text>
           </View>
           <View style={styles.progressBar}>
             {pKeys.map(ph => {
@@ -57,36 +86,36 @@ export default function HomeScreen({ pi, profile }) {
           </View>
           <View style={[styles.tagBg, { backgroundColor: d?.mid }]}>
             <Text style={[styles.tagText, { color: d?.color }]}>{d?.tagline}</Text>
-            <Text style={styles.tagMuted}> · Quedan <Text style={{ fontWeight: '700' }}>{pi?.daysLeft} día{pi?.daysLeft !== 1 ? 's' : ''}</Text></Text>
+            <Text style={styles.tagMuted}> · {h.remaining} <Text style={{ fontWeight: '700' }}>{pi?.daysLeft} {pi?.daysLeft !== 1 ? c.days : c.day}</Text></Text>
           </View>
         </View>
 
         <View style={styles.grid}>
           <View style={[styles.card, styles.gridCard]}>
-            <Text style={styles.cardLabel}>INTENSIDAD HOY</Text>
+            <Text style={styles.cardLabel}>{h.intensityToday}</Text>
             <Text style={[styles.intensity, { color: d?.color }]}>{d?.intensity}</Text>
             <View style={styles.intensityBar}>
               <View style={[styles.intensityFill, { width: `${d?.intensityPct}%`, backgroundColor: d?.color }]} />
             </View>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate('Gimnasio')} style={[styles.card, styles.gridCard]}>
-  <Text style={styles.cardLabel}>SESIÓN HOY</Text>
-  <Text style={{ fontSize: 22 }}>{d?.week[0].ico}</Text>
-  <Text style={styles.sessionName}>{d?.week[0].name}</Text>
-  {d?.week[0].dur ? <Text style={[styles.sessionDur, { color: BLUE.primary }]}>{d?.week[0].dur}</Text> : null}
+  <Text style={styles.cardLabel}>{h.sessionToday}</Text>
+  <Text style={{ fontSize: 22 }}>{todaySession?.ico ?? '😴'}</Text>
+  <Text style={styles.sessionName}>{todaySession?.name ?? (lang === 'en' ? 'Rest' : lang === 'fr' ? 'Repos' : 'Descanso')}</Text>
+  {todaySession?.dur ? <Text style={[styles.sessionDur, { color: BLUE.primary }]}>{todaySession.dur}</Text> : null}
 </TouchableOpacity>
         </View>
 {cals && (
   <View style={styles.card}>
-    <Text style={styles.sectionTitle}>🔥 Calorías objetivo hoy</Text>
+    <Text style={styles.sectionTitle}>{h.caloriesGoal}</Text>
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
       <View style={{ alignItems: 'center' }}>
         <Text style={{ fontSize: 32, fontWeight: '700', color: d?.color }}>{cals.total}</Text>
-        <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>kcal · objetivo fase</Text>
+        <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>{h.kcalPhase}</Text>
       </View>
       <View style={{ alignItems: 'center' }}>
         <Text style={{ fontSize: 20, fontWeight: '600', color: '#475569' }}>{cals.tdee}</Text>
-        <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>kcal · mantenimiento</Text>
+        <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>{h.kcalMaint}</Text>
       </View>
       <View style={{ backgroundColor: d?.mid, borderRadius: 10, padding: 10, alignItems: 'center' }}>
         <Text style={{ fontSize: 13, fontWeight: '700', color: d?.color }}>{d?.kcal?.split('·')[0]}</Text>
@@ -95,18 +124,18 @@ export default function HomeScreen({ pi, profile }) {
   </View>
 )}
         <TouchableOpacity onPress={() => navigation.navigate('Nutrición')} style={styles.card}>
-  <Text style={styles.sectionTitle}>🥗 Nutrición de hoy</Text>
+  <Text style={styles.sectionTitle}>{h.nutritionToday}</Text>
   <View style={styles.tags}>
     {d?.focus.map(f => <View key={f} style={styles.tag}><Text style={styles.tagLabel}>{f}</Text></View>)}
   </View>
   <View style={[styles.highlight, { borderLeftColor: BLUE.primary }]}>
     <Text style={styles.highlightTitle}>{d?.meals[0].ico} {d?.meals[0].title}</Text>
-    <Text style={styles.highlightSub}>{d?.meals[0].items.join(' · ')}</Text>
+    <Text style={styles.highlightSub}>{getMealLabel(lang, d?.meals[0].t)} · {d?.meals[0].items.slice(0,2).join(' · ')}</Text>
   </View>
 </TouchableOpacity>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>💡 Consejo de la fase</Text>
+          <Text style={styles.sectionTitle}>{h.phaseTip}</Text>
           <Text style={styles.tip}>"{d?.tip}"</Text>
         </View>
       </ScrollView>

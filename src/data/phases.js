@@ -93,15 +93,30 @@ export const PHASES = {
   }
 };
 
-export const getPhaseInfo = (dateStr, cycleLen) => {
+export const getPhaseInfo = (dateStr, cycleLen, periodEndDate = null) => {
   if (!dateStr) return null;
   const start = new Date(dateStr); start.setHours(0, 0, 0, 0);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const diff = Math.round((today - start) / 86400000);
   const day = (diff % cycleLen) + 1;
-  const phase = day <= 5 ? 'menstrual' : day <= 13 ? 'follicular' : day <= 16 ? 'ovulation' : 'luteal';
-  const nextDay = phase === 'menstrual' ? 6 : phase === 'follicular' ? 14 : phase === 'ovulation' ? 17 : cycleLen + 1;
-  return { phase, day, daysLeft: Math.max(nextDay - day, 0), data: PHASES[phase], cycleLen };
+
+  // Determine actual menstrual end (default day 5, overridden by logged period end)
+  let menstrualEnd = 5;
+  if (periodEndDate) {
+    const pEnd = new Date(periodEndDate); pEnd.setHours(0, 0, 0, 0);
+    const pEndDay = Math.round((pEnd - start) / 86400000) + 1;
+    if (pEndDay >= 1 && pEndDay <= 12) menstrualEnd = pEndDay;
+  }
+
+  const phase = day <= menstrualEnd ? 'menstrual'
+    : day <= 13 ? 'follicular'
+    : day <= 16 ? 'ovulation'
+    : 'luteal';
+  const nextDay = phase === 'menstrual' ? menstrualEnd + 1
+    : phase === 'follicular' ? 14
+    : phase === 'ovulation' ? 17
+    : cycleLen + 1;
+  return { phase, day, daysLeft: Math.max(nextDay - day, 0), data: PHASES[phase], cycleLen, menstrualEnd };
 };
 
 export const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];

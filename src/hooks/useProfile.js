@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { syncNotifications } from '../utils/notifications';
+import { syncNotifications, requestNotificationPermission } from '../utils/notifications';
+import { trackEvent, resetAnalytics, Events } from '../lib/analytics';
 
 export const useProfile = () => {
   const [authState, setAuthState] = useState('loading');
@@ -40,6 +41,14 @@ export const useProfile = () => {
         setWeight(data.weight);
         setHeight(data.height);
         setSetupDone(true);
+        // Resync notificaciones en cada apertura de app (workout IDs duran 14 días)
+        const ext = data.profile_extended || {};
+        syncNotifications({
+          lastPeriod:    data.last_period,
+          cycleLength:   data.cycle_length || 28,
+          trainDays:     data.train_days   || [],
+          notifSettings: ext.notifSettings || {},
+        }, ext.language || 'es').catch(() => {});
       }
     }
     setProfileLoaded(true);
@@ -124,23 +133,50 @@ export const useProfile = () => {
     if (Object.keys(overrides).length) await saveProfile(overrides);
   };
 
-  const handleSetupDone = async ({ name: n, age: a, weight: w, height: h, modules: m }) => {
+  const handleSetupDone = async ({ name: n, age: a, weight: w, height: h, activityLevel: al, modules: m, goals: g }) => {
     setAge(a); setWeight(w); setHeight(h);
-    // Guardar nombre, módulos en profile_extended y marcar onboarding como completo
-    const extended = { ...(profileExtended || {}), name: n || '', modules: m, profileOnboardingComplete: true };
+    if (al) setActivityLevel(al);
+
+    // Mapear objetivo de nutrición al campo "goal" principal de la tabla profiles
+    // (el resto de objetivos por categoría se guardan en profile_extended.goals)
+    const nutritionGoal = g?.nutrition;
+    const mainGoal = nutritionGoal === 'lose_weight' ? 'lose_weight'
+                    : nutritionGoal === 'gain_weight' ? 'gain_muscle'
+                    : nutritionGoal === 'eat_better'  ? 'maintain'
+                    : nutritionGoal === 'energize'    ? 'maintain'
+                    : 'maintain';
+    if (mainGoal) setGoal(mainGoal);
+
+    const extended = {
+      ...(profileExtended || {}),
+      name: n || '',
+      modules: m,
+      goals: g || {},
+      profileOnboardingComplete: true,
+    };
     setProfileExtended(extended);
     await supabase.from('profiles').upsert({
       id: user.id,
       age: a, weight: w, height: h,
-      // Valores por defecto — la usuaria los ajustará desde su perfil
-      activity_level: 'moderate',
-      goal: 'lose_weight',
+      activity_level: al || 'moderate',
+      goal: mainGoal,
       dietary_restrictions: [],
       train_days: [],
       profile_extended: extended,
       updated_at: new Date().toISOString(),
     });
     setSetupDone(true);
+    // Pedir permiso de notificaciones al terminar el onboarding y programar las por defecto
+    requestNotificationPermission().then(granted => {
+      if (granted) {
+        syncNotifications({
+          lastPeriod:    null,
+          cycleLength:   28,
+          trainDays:     [],
+          notifSettings: { cycle: true, workout: true, hydration: true, hydrationHour: 12 },
+        }, extended.language || 'es').catch(() => {});
+      }
+    }).catch(() => {});
   };
 
   const saveProfileExtended = async (data) => {
@@ -166,6 +202,65 @@ export const useProfile = () => {
     await saveProfileExtended({ sleepLog: updated });
   };
 
+  // ─── Favoritos ───────────────────────────────────────────────────────────────
+  const toggleFavoriteRecipe = async (recipeId) => {
+    const favs = profileExtended?.favoriteRecipes || [];
+    const wasFav = favs.includes(recipeId);
+    const next = wasFav ? favs.filter(x => x !== recipeId) : [...favs, recipeId];
+    await saveProfileExtended({ favoriteRecipes: next });
+    if (!wasFav) trackEvent(Events.RECIPE_FAVORITED, { recipeId });
+  };
+
+  const toggleFavoriteWorkout = async (workoutId) => {
+    const favs = profileExtended?.favoriteWorkouts || [];
+    const wasFav = favs.includes(workoutId);
+    const next = wasFav ? favs.filter(x => x !== workoutId) : [...favs, workoutId];
+    await saveProfileExtended({ favoriteWorkouts: next });
+    if (!wasFav) trackEvent(Events.WORKOUT_FAVORITED, { workoutId });
+  };
+
+  // ─── Swap (saltar item de hoy) ──────────────────────────────────────────────
+  const skipRecipe = async (mealType, recipeId) => {
+    const today = new Date().toISOString().split('T')[0];
+    const skipped = profileExtended?.skippedToday || {};
+    // Resetea si es un día nuevo
+    const todayBlock = skipped.date === today ? skipped : { date: today };
+    const mealList = todayBlock[mealType] || [];
+    todayBlock[mealType] = [...mealList, recipeId];
+    await saveProfileExtended({ skippedToday: todayBlock });
+  };
+
+  const skipWorkout = async (workoutId) => {
+    const today = new Date().toISOString().split('T')[0];
+    const skipped = profileExtended?.skippedTodayWorkout || {};
+    const todayBlock = skipped.date === today ? skipped : { date: today, ids: [] };
+    todayBlock.ids = [...(todayBlock.ids || []), workoutId];
+    await saveProfileExtended({ skippedTodayWorkout: todayBlock });
+  };
+
+  // ─── Log de actividad ───────────────────────────────────────────────────────
+  const logRecipeDone = async (mealType, status) => {
+    // status: 'done' | 'skipped'
+    const today = new Date().toISOString().split('T')[0];
+    const log = profileExtended?.activityLog || {};
+    const day = log[today] || {};
+    const meals = { ...(day.recipes || {}), [mealType]: status };
+    await saveProfileExtended({ activityLog: { ...log, [today]: { ...day, recipes: meals } } });
+  };
+
+  // ─── Cycle tracking diario ──────────────────────────────────────────────────
+  const logCycleDay = async (dateStr, data) => {
+    const cycleLog = profileExtended?.cycleLog || {};
+    await saveProfileExtended({ cycleLog: { ...cycleLog, [dateStr]: data } });
+  };
+
+  const logWorkoutDone = async (status) => {
+    const today = new Date().toISOString().split('T')[0];
+    const log = profileExtended?.activityLog || {};
+    const day = log[today] || {};
+    await saveProfileExtended({ activityLog: { ...log, [today]: { ...day, workout: status } } });
+  };
+
   const logWeight = async (entry) => {
     // entry: { date: 'YYYY-MM-DD', weight: 65.2 }
     const existing = profileExtended?.weightLog || [];
@@ -177,6 +272,8 @@ export const useProfile = () => {
   };
 
   const signOut = async () => {
+    trackEvent(Events.USER_SIGNED_OUT);
+    resetAnalytics();
     await supabase.auth.signOut();
     setLP(''); setCL(28); setTD([1, 2, 4, 5]);
     setAge(null); setWeight(null); setHeight(null);
@@ -192,6 +289,9 @@ export const useProfile = () => {
     programContent,
     setLastPeriod, setCycleLength, setTrainDays,
     setPeriodEnd, logSleep, logWeight,
+    toggleFavoriteRecipe, toggleFavoriteWorkout,
+    skipRecipe, skipWorkout,
+    logRecipeDone, logWorkoutDone, logCycleDay,
     handleSetupDone, saveAll, saveProfileExtended, signOut,
   };
 };

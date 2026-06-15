@@ -5,6 +5,9 @@ import ProgressChart from '../components/ProgressChart';
 import { syncWeekToCalendar, removeAllCalendarEvents, exportWeekICS, IS_EXPO_GO, getWorkoutForDate } from '../utils/calendarSync';
 import { useDiets, DIET_CATEGORIES, normalizeDietId } from '../hooks/useDiets';
 import { syncNotifications, cancelAllMeirinsNotifications } from '../utils/notifications';
+import { ALL_MEALS, MEAL_LABELS, getActiveMeals } from '../utils/fastingMeals';
+import { Linking, Image, Alert } from 'react-native';
+import { PRIVACY_URL, TERMS_URL, SUPPORT_EMAIL } from '../lib/legalLinks';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -152,10 +155,12 @@ export default function PerfilScreen({ pi, profile, signOut }) {
   const [editGym,          setEditGym]          = useState(ext.gymAccess      || '');
   const [editDiet,         setEditDiet]         = useState(ext.diet              || '');
   const [editFasting,      setEditFasting]      = useState(ext.fastingProtocol  || '');
+  const [editMealsActive,  setEditMealsActive]  = useState(ext.mealsActive      || null);
   const [editAllergies,    setEditAllergies]    = useState(ext.allergies      || []);
   const [editDislikes,     setEditDislikes]     = useState(ext.foodDislikes   || []);
   const [editCooking,      setEditCooking]      = useState(ext.cookingTime    || '');
   const [editBudget,       setEditBudget]       = useState(ext.weeklyBudget   || '');
+  const [editBatchCooking, setEditBatchCooking] = useState(!!ext.batchCooking);
   const [editGoals,        setEditGoals]        = useState(
     ext.primaryGoals?.length > 0 ? ext.primaryGoals : ext.primaryGoal ? [ext.primaryGoal] : []
   );
@@ -196,9 +201,9 @@ export default function PerfilScreen({ pi, profile, signOut }) {
 
   const handleSaveNotifSettings = async (newSettings) => {
     setNotifSaving(true);
-    const merged = { ...notifSettings, ...newSettings };
-    await profile.saveProfileExtended({ notifSettings: merged });
     try {
+      const merged = { ...notifSettings, ...newSettings };
+      await profile.saveProfileExtended({ notifSettings: merged });
       const lastPeriod = ext.lastPeriod || profile?.lastPeriod || null;
       await syncNotifications({
         lastPeriod,
@@ -209,8 +214,9 @@ export default function PerfilScreen({ pi, profile, signOut }) {
       setNotifStatus('ok');
     } catch (e) {
       setNotifStatus(e.message?.includes('permission') ? 'denied' : 'error');
+    } finally {
+      setNotifSaving(false);
     }
-    setNotifSaving(false);
   };
 
   const handleDisableAllNotifs = async () => {
@@ -225,6 +231,8 @@ export default function PerfilScreen({ pi, profile, signOut }) {
   const calEvents      = ext.calendarEvents   || {};
   const [calSyncing,   setCalSyncing]   = useState(false);
   const [calStatus,    setCalStatus]    = useState('idle'); // 'idle'|'synced'|'error'|'denied'
+  const [deleting,     setDeleting]     = useState(false);
+  const [deleteStep,   setDeleteStep]   = useState(0); // 0=hidden 1=confirm 2=deleting
   const HOUR_OPTIONS   = [6, 7, 8, 9, 17, 18, 19, 20];
 
   const todayWorkout = pi?.phase ? getWorkoutForDate(pi.phase, todayStr) : null;
@@ -352,13 +360,10 @@ export default function PerfilScreen({ pi, profile, signOut }) {
 
   const saveProgram = async () => {
     setSavingExt(true);
-    await profile.saveProfileExtended({
-      fitnessLevel: editFitness, gymAccess: editGym, gymSetupDone: true,
-      diet: editDiet, fastingProtocol: editFasting,
-      allergies: editAllergies,
-      foodDislikes: editDislikes, cookingTime: editCooking,
-      weeklyBudget: editBudget, primaryGoals: editGoals,
-    });
+    // Este formulario solo edita los objetivos. El resto (dieta, ayuno,
+    // alergias, nivel, lugar…) se gestiona en las pestañas Nutrición y
+    // Gimnasio — no se sobreescribe aquí para no machacar datos.
+    await profile.saveProfileExtended({ primaryGoals: editGoals });
     setSavingExt(false);
     setEditing(null);
   };
@@ -376,9 +381,94 @@ export default function PerfilScreen({ pi, profile, signOut }) {
     setEditing(null);
   };
 
+  // ── Avatar de usuario ──
+  const avatarUri = ext.avatarUri || null;
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const pickAvatar = async (source) => {
+    try {
+      setAvatarUploading(true);
+      const ImagePicker = require('expo-image-picker');
+
+      // Pedir permiso
+      let perm;
+      if (source === 'camera') {
+        perm = await ImagePicker.requestCameraPermissionsAsync();
+      } else {
+        perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      }
+      if (perm.status !== 'granted') {
+        Alert.alert(
+          lang === 'en' ? 'Permission needed' : 'Permiso necesario',
+          lang === 'en' ? 'Enable access in Settings.' : 'Actívalo en Ajustes.',
+        );
+        setAvatarUploading(false);
+        return;
+      }
+
+      const picker = source === 'camera' ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
+      const result = await picker({
+        mediaTypes:    ImagePicker.MediaTypeOptions?.Images,
+        allowsEditing: true,
+        aspect:        [1, 1],
+        quality:       0.5,
+        base64:        true,
+      });
+
+      if (!result.canceled && result.assets?.[0]?.base64) {
+        const uri = `data:image/jpeg;base64,${result.assets[0].base64}`;
+        await profile.saveProfileExtended({ avatarUri: uri });
+      }
+    } catch (e) {
+      console.warn('Avatar pick error:', e);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const removeAvatar = () => {
+    Alert.alert(
+      lang === 'en' ? 'Remove photo?' : '¿Eliminar foto?',
+      '',
+      [
+        { text: lang === 'en' ? 'Cancel' : 'Cancelar', style: 'cancel' },
+        { text: lang === 'en' ? 'Remove' : 'Eliminar', style: 'destructive', onPress: async () => {
+          await profile.saveProfileExtended({ avatarUri: null });
+        }},
+      ],
+    );
+  };
+
+  const handleAvatarPress = () => {
+    Alert.alert(
+      lang === 'en' ? 'Profile picture' : lang === 'fr' ? 'Photo de profil' : 'Foto de perfil',
+      '',
+      [
+        { text: lang === 'en' ? '📷 Camera' : '📷 Cámara', onPress: () => pickAvatar('camera') },
+        { text: lang === 'en' ? '🖼 Photos' : '🖼 Galería', onPress: () => pickAvatar('library') },
+        ...(avatarUri ? [{ text: lang === 'en' ? '🗑 Remove' : '🗑 Eliminar', style: 'destructive', onPress: removeAvatar }] : []),
+        { text: lang === 'en' ? 'Cancel' : 'Cancelar', style: 'cancel' },
+      ],
+    );
+  };
+
   const p = T[lang] || T.es;
   const { diets: allDiets, dietsByCategory, getDiet } = useDiets(lang);
   const name = ext.name || '';
+
+  // ── Editar nombre con prompt ─────────────────────────────────────────────
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft]     = useState(name);
+
+  const handleEditName = () => {
+    setNameDraft(name);
+    setEditingName(true);
+  };
+  const saveName = async () => {
+    const trimmed = (nameDraft || '').trim();
+    await profile.saveProfileExtended({ name: trimmed });
+    setEditingName(false);
+  };
 
   const ACTIVITY_OPTIONS = [
     { id: 'sedentary', emoji: '🛋️', label: p.activity.sedentary },
@@ -408,10 +498,61 @@ export default function PerfilScreen({ pi, profile, signOut }) {
 
       {/* ── CABECERA ── */}
       <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{name ? name[0].toUpperCase() : '👤'}</Text>
-        </View>
-        {!!name && <Text style={styles.headerName}>{name}</Text>}
+        <TouchableOpacity onPress={handleAvatarPress} activeOpacity={0.8} style={styles.avatarWrap}>
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.avatarImg} />
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{name ? name[0].toUpperCase() : '👤'}</Text>
+            </View>
+          )}
+          <View style={styles.avatarEdit}>
+            <Text style={styles.avatarEditTxt}>{avatarUploading ? '⏳' : '📷'}</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleEditName} activeOpacity={0.7}>
+          {name ? (
+            <Text style={styles.headerName}>{name} <Text style={{ fontSize: 14, color: '#94A3B8' }}>✏️</Text></Text>
+          ) : (
+            <Text style={[styles.headerName, { color: '#94A3B8', fontStyle: 'italic' }]}>
+              + {lang === 'en' ? 'Add your name' : lang === 'fr' ? 'Ajoute ton prénom' : lang === 'it' ? 'Aggiungi il tuo nome' : 'Añade tu nombre'}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Modal de edición de nombre */}
+        {editingName && (
+          <View style={styles.nameModalOverlay}>
+            <View style={styles.nameModal}>
+              <Text style={styles.nameModalTitle}>
+                {lang === 'en' ? 'Your name' : lang === 'fr' ? 'Ton prénom' : lang === 'it' ? 'Il tuo nome' : 'Tu nombre'}
+              </Text>
+              <TextInput
+                style={styles.nameInput}
+                value={nameDraft}
+                onChangeText={setNameDraft}
+                placeholder={lang === 'en' ? 'Your name…' : lang === 'fr' ? 'Ton prénom…' : 'Tu nombre…'}
+                autoFocus
+                maxLength={30}
+                placeholderTextColor="#94A3B8"
+              />
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
+                <TouchableOpacity onPress={() => setEditingName(false)}
+                  style={[styles.nameModalBtn, { backgroundColor: '#F1F5F9' }]}>
+                  <Text style={{ color: '#64748B', fontWeight: '600' }}>
+                    {lang === 'en' ? 'Cancel' : 'Cancelar'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={saveName}
+                  style={[styles.nameModalBtn, { backgroundColor: BLUE.primary }]}>
+                  <Text style={{ color: 'white', fontWeight: '700' }}>
+                    {lang === 'en' ? 'Save' : 'Guardar'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
         <View style={styles.headerMeta}>
           {!!profile?.age && <Text style={styles.metaChip}>{profile.age} {p.profile.years}</Text>}
           {!!ext.lifeStage && <Text style={styles.metaChip}>{lbl(LIFE_L, ext.lifeStage, lang)}</Text>}
@@ -525,7 +666,8 @@ export default function PerfilScreen({ pi, profile, signOut }) {
               </View>
             )}
             <InfoRow icon="🏋️" title={p.profile.fitnessLevel} value={lbl(FITNESS_L, editFitness, lang) || '—'} />
-            <InfoRow icon="🏟️" title={p.profile.whereITrain} value={lbl(GYM_L, editGym, lang) || '—'} />
+            <InfoRow icon="🏟️" title={p.profile.whereITrain}
+              value={(Array.isArray(editGym) ? editGym : [editGym]).filter(Boolean).map(g => lbl(GYM_L, g, lang)).filter(Boolean).join(', ') || '—'} />
             <InfoRow icon="🍽️" title={p.profile.dietType}
               value={[
                 editDiet ? (getDiet(normalizeDietId(editDiet))?.name?.[lang] || lbl(DIET_L, editDiet, lang)) : null,
@@ -572,219 +714,19 @@ export default function PerfilScreen({ pi, profile, signOut }) {
               ))}
             </>}
 
-            {/* Nivel fitness */}
-            {p.onboarding?.fitness && <>
-              <Text style={[styles.editSection, { marginTop: 16 }]}>{p.onboarding.fitnessLabel || p.profile.fitnessLevel.toUpperCase()}</Text>
-              {p.onboarding.fitness.map(o => (
-                <TouchableOpacity key={o.v} onPress={() => setEditFitness(o.v)}
-                  style={[styles.optRow, editFitness === o.v && styles.optRowActive]}>
-                  <Text style={styles.optEmoji}>{o.ico}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.optLabel, editFitness === o.v && { color: BLUE.primary, fontWeight: '700' }]}>{o.l}</Text>
-                    {o.d ? <Text style={{ fontSize: 11, color: '#94A3B8' }}>{o.d}</Text> : null}
-                  </View>
-                  <View style={[styles.radio, editFitness === o.v && styles.radioActive]}>
-                    {editFitness === o.v && <View style={styles.radioDot} />}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </>}
-
-            {/* Dónde entrena */}
-            {p.onboarding?.gymOptions && <>
-              <Text style={[styles.editSection, { marginTop: 16 }]}>{p.onboarding.gymLabel || p.profile.whereITrain.toUpperCase()}</Text>
-              {p.onboarding.gymOptions.map(o => (
-                <TouchableOpacity key={o.v} onPress={() => setEditGym(o.v)}
-                  style={[styles.optRow, editGym === o.v && styles.optRowActive]}>
-                  <Text style={styles.optEmoji}>{o.ico}</Text>
-                  <Text style={[styles.optLabel, editGym === o.v && { color: BLUE.primary, fontWeight: '700' }]}>{o.l}</Text>
-                  <View style={[styles.radio, editGym === o.v && styles.radioActive]}>
-                    {editGym === o.v && <View style={styles.radioDot} />}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </>}
-
-            {/* ── DIETA BASE ── */}
-            <Text style={[styles.editSection, { marginTop: 16 }]}>
-              {p.onboarding?.dietLabel || p.profile?.dietType?.toUpperCase() || 'TIPO DE DIETA'}
+            {/* Nota: nutrición y entrenamiento se editan desde los banners
+                contextuales de sus pestañas (Nutrición y Gimnasio). */}
+            <Text style={{ fontSize: 12, color: '#94A3B8', textAlign: 'center', marginTop: 16, lineHeight: 18 }}>
+              {lang === 'en' ? '🥗 Edit diet, fasting, meals, allergies and supplements\nfrom the Nutrition tab.\n🏋️ Edit days, level, location and sport goal\nfrom the Gym tab.'
+               : lang === 'fr' ? '🥗 Modifie régime, jeûne, repas, allergies et compléments\ndans l\'onglet Nutrition.\n🏋️ Modifie jours, niveau, lieu et objectif sportif\ndans l\'onglet Gym.'
+               : lang === 'it' ? '🥗 Modifica dieta, digiuno, pasti, allergie e integratori\ndalla scheda Nutrizione.\n🏋️ Modifica giorni, livello, luogo e obiettivo sportivo\ndalla scheda Palestra.'
+               : '🥗 Edita dieta, ayuno, comidas, alergias y complementos\ndesde la pestaña Nutrición.\n🏋️ Edita días, nivel, lugar y objetivo deportivo\ndesde la pestaña Gimnasio.'}
             </Text>
-            {allDiets.length > 0
-              ? Object.entries(dietsByCategory)
-                  .filter(([cat]) => cat !== 'fasting')   // ayunos van separados abajo
-                  .map(([cat, catDiets]) => {
-                    const catInfo = DIET_CATEGORIES[cat] || { icon: '🍽️', label: { es: cat, en: cat } };
-                    return (
-                      <View key={cat} style={{ marginBottom: 4 }}>
-                        <Text style={styles.dietCatLabel}>
-                          {catInfo.icon} {catInfo.label[lang] || catInfo.label.es}
-                        </Text>
-                        {catDiets.map(d => {
-                          const sel = normalizeDietId(editDiet) === d.id;
-                          return (
-                            <TouchableOpacity key={d.id} onPress={() => setEditDiet(sel ? '' : d.id)}
-                              style={[styles.optRow, sel && styles.optRowActive]}>
-                              <Text style={styles.optEmoji}>{d.icon}</Text>
-                              <View style={{ flex: 1 }}>
-                                <Text style={[styles.optLabel, sel && { color: BLUE.primary, fontWeight: '700' }]}>
-                                  {d.name[lang] || d.name.es}
-                                </Text>
-                              </View>
-                              <View style={[styles.radio, sel && styles.radioActive]}>
-                                {sel && <View style={styles.radioDot} />}
-                              </View>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    );
-                  })
-              : (p.onboarding?.diets || []).map(o => (
-                  <TouchableOpacity key={o.v} onPress={() => setEditDiet(o.v)}
-                    style={[styles.optRow, editDiet === o.v && styles.optRowActive]}>
-                    <Text style={styles.optEmoji}>{o.ico}</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.optLabel, editDiet === o.v && { color: BLUE.primary, fontWeight: '700' }]}>{o.l}</Text>
-                    </View>
-                    <View style={[styles.radio, editDiet === o.v && styles.radioActive]}>
-                      {editDiet === o.v && <View style={styles.radioDot} />}
-                    </View>
-                  </TouchableOpacity>
-                ))
-            }
-
-            {/* ── PROTOCOLO DE AYUNO (opcional, combinable) ── */}
-            {dietsByCategory['fasting']?.length > 0 && <>
-              <Text style={[styles.editSection, { marginTop: 20 }]}>
-                ⏰ {lang === 'en' ? 'FASTING PROTOCOL (OPTIONAL)'
-                    : lang === 'fr' ? 'PROTOCOLE DE JEÛNE (OPTIONNEL)'
-                    : lang === 'it' ? 'PROTOCOLLO DI DIGIUNO (OPZIONALE)'
-                    : 'PROTOCOLO DE AYUNO (OPCIONAL)'}
-              </Text>
-              <Text style={styles.fastingNote}>
-                {lang === 'en' ? 'Can be combined with any diet above'
-                 : lang === 'fr' ? 'Peut se combiner avec n\'importe quel régime ci-dessus'
-                 : lang === 'it' ? 'Può essere combinato con qualsiasi dieta sopra'
-                 : 'Se puede combinar con cualquier dieta anterior'}
-              </Text>
-              {dietsByCategory['fasting'].map(d => {
-                const sel = editFasting === d.id;
-                const fw  = d.fasting_window;
-                return (
-                  <TouchableOpacity key={d.id} onPress={() => setEditFasting(sel ? '' : d.id)}
-                    style={[styles.optRow, sel && styles.optRowActive]}>
-                    <Text style={styles.optEmoji}>{d.icon}</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.optLabel, sel && { color: BLUE.primary, fontWeight: '700' }]}>
-                        {d.name[lang] || d.name.es}
-                      </Text>
-                      {fw && (
-                        <Text style={{ fontSize: 11, color: '#94A3B8' }}>
-                          {fw.eating_hours
-                            ? `🍽 ${fw.eating_hours}h · 🚫 ${fw.fasting_hours}h`
-                            : fw.eating_days
-                            ? `${fw.eating_days} días normales · ${fw.fast_days} días de ${fw.fast_day_kcal_women} kcal`
-                            : ''}
-                        </Text>
-                      )}
-                    </View>
-                    <View style={[styles.radio, sel && styles.radioActive]}>
-                      {sel && <View style={styles.radioDot} />}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </>}
-
-            {/* Alergias */}
-            {p.onboarding?.allergies && <>
-              <Text style={[styles.editSection, { marginTop: 16, color: '#EF4444' }]}>⚠️ {p.onboarding.allergyLabel || p.profile.allergies.toUpperCase()}</Text>
-              <View style={styles.row}>
-                {p.onboarding.allergies.map(o => {
-                  const sel = editAllergies.includes(o.v);
-                  return (
-                    <TouchableOpacity key={o.v} onPress={() => toggleExtArr(editAllergies, setEditAllergies, o.v)}
-                      style={[styles.chip, sel && { backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#EF4444' }]}>
-                      <Text style={[styles.chipText, sel && { color: '#EF4444' }]}>{o.l}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </>}
-
-            {/* Alimentos a evitar */}
-            {p.onboarding?.dislikes && <>
-              <Text style={[styles.editSection, { marginTop: 16 }]}>{p.onboarding.dislikesLabel || p.profile.avoids.toUpperCase()}</Text>
-              <View style={styles.row}>
-                {p.onboarding.dislikes.map(o => {
-                  const sel = editDislikes.includes(o.v);
-                  return (
-                    <TouchableOpacity key={o.v} onPress={() => toggleExtArr(editDislikes, setEditDislikes, o.v)}
-                      style={[styles.chip, sel && { backgroundColor: BLUE.light, borderWidth: 1, borderColor: BLUE.primary }]}>
-                      <Text style={[styles.chipText, sel && { color: BLUE.primary }]}>{o.l}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </>}
-
-            {/* Tiempo de cocina */}
-            {p.onboarding?.cooking && <>
-              <Text style={[styles.editSection, { marginTop: 16 }]}>{p.onboarding.cookingLabel || p.profile.cookingTime.toUpperCase()}</Text>
-              {p.onboarding.cooking.map(o => (
-                <TouchableOpacity key={o.v} onPress={() => setEditCooking(o.v)}
-                  style={[styles.optRow, editCooking === o.v && styles.optRowActive]}>
-                  <Text style={styles.optLabel}>{o.l}</Text>
-                  <View style={[styles.radio, editCooking === o.v && styles.radioActive]}>
-                    {editCooking === o.v && <View style={styles.radioDot} />}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </>}
-
-            {p.onboarding?.budgets && <>
-              <Text style={[styles.editSection, { marginTop: 16 }]}>{p.onboarding.budgetLabel || p.profile.budget.toUpperCase()}</Text>
-              {p.onboarding.budgets.map(o => (
-                <TouchableOpacity key={o.v} onPress={() => setEditBudget(o.v)}
-                  style={[styles.optRow, editBudget === o.v && styles.optRowActive]}>
-                  <Text style={styles.optLabel}>{o.l}</Text>
-                  <View style={[styles.radio, editBudget === o.v && styles.radioActive]}>
-                    {editBudget === o.v && <View style={styles.radioDot} />}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </>}
 
             <TouchableOpacity style={styles.saveBtn} onPress={saveProgram} disabled={savingExt}>
               <Text style={styles.saveBtnText}>{savingExt ? p.profile.saving : p.profile.save}</Text>
             </TouchableOpacity>
           </ScrollView>
-        )}
-      </View>
-
-      {/* ── DÍAS DE ENTRENO ── */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>{p.profile.trainDays}</Text>
-          <TouchableOpacity onPress={() => setEditing(editing === 'days' ? null : 'days')}>
-            <Text style={styles.editBtn}>{editing === 'days' ? p.profile.close : p.profile.edit}</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.daysRow}>
-          {[0, 1, 2, 3, 4, 5, 6].map(d => {
-            const active = trainDays.includes(d);
-            return (
-              <TouchableOpacity key={d} onPress={() => editing === 'days' && toggleDay(d)}
-                style={[styles.dayChip, { backgroundColor: active ? BLUE.primary : '#E2E8F0' }]}>
-                <Text style={[styles.dayChipText, { color: active ? 'white' : '#94A3B8' }]}>{DAY_SHORT[d]}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        {editing === 'days' && (
-          <TouchableOpacity style={[styles.saveBtn, { marginTop: 12 }]} onPress={save} disabled={saving}>
-            <Text style={styles.saveBtnText}>{saving ? p.profile.saving : p.profile.save}</Text>
-          </TouchableOpacity>
         )}
       </View>
 
@@ -812,8 +754,8 @@ export default function PerfilScreen({ pi, profile, signOut }) {
           : null;
 
         // Progreso hacia objetivo de peso
-        const startW  = weightLog.length > 0 ? weightLog[weightLog.length - 1].value : profile?.weight;
-        const currW   = weightLog.length > 0 ? weightLog[0].value : profile?.weight;
+        const startW  = weightLog.length > 0 ? weightLog[weightLog.length - 1].weight : profile?.weight;
+        const currW   = weightLog.length > 0 ? weightLog[0].weight : profile?.weight;
         const tgt     = ext.targetWeight ? +ext.targetWeight : null;
         const totalNeeded = startW && tgt ? Math.abs(tgt - startW) : null;
         const done        = startW && currW && tgt ? Math.abs(currW - startW) : null;
@@ -1423,6 +1365,55 @@ export default function PerfilScreen({ pi, profile, signOut }) {
       </View>
 
       {/* ── CERRAR SESIÓN ── */}
+      {/* ── LEGAL ── */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>
+          📄 {lang === 'en' ? 'Legal & support' : lang === 'fr' ? 'Légal & support' : lang === 'it' ? 'Legale & supporto' : 'Legal y soporte'}
+        </Text>
+
+        <TouchableOpacity style={styles.legalLink} onPress={() => Linking.openURL(PRIVACY_URL)}>
+          <Text style={styles.legalEmoji}>🔒</Text>
+          <Text style={styles.legalLabel}>
+            {lang === 'en' ? 'Privacy policy' : lang === 'fr' ? 'Politique de confidentialité' : lang === 'it' ? 'Privacy policy' : 'Política de privacidad'}
+          </Text>
+          <Text style={styles.legalArrow}>→</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.legalLink} onPress={() => Linking.openURL(TERMS_URL)}>
+          <Text style={styles.legalEmoji}>📜</Text>
+          <Text style={styles.legalLabel}>
+            {lang === 'en' ? 'Terms of use' : lang === 'fr' ? 'Conditions d\'utilisation' : lang === 'it' ? 'Termini di utilizzo' : 'Términos de uso'}
+          </Text>
+          <Text style={styles.legalArrow}>→</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.legalLink} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Meirins%20support`)}>
+          <Text style={styles.legalEmoji}>✉️</Text>
+          <Text style={styles.legalLabel}>
+            {lang === 'en' ? 'Contact support' : lang === 'fr' ? 'Contacter le support' : lang === 'it' ? 'Contatta il supporto' : 'Contactar con soporte'}
+          </Text>
+          <Text style={styles.legalArrow}>→</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.legalVersion}>Meirins · v1.0.0</Text>
+      </View>
+
+      {/* ── AVISO MÉDICO ── */}
+      <View style={styles.medCard}>
+        <Text style={styles.medCardTitle}>
+          ⚕️ {lang === 'en' ? 'Medical disclaimer' : lang === 'fr' ? 'Avis médical' : lang === 'it' ? 'Avviso medico' : 'Aviso médico'}
+        </Text>
+        <Text style={styles.medCardBody}>
+          {lang === 'en'
+            ? 'Meirins is an information and wellness tool. It does not replace medical, gynaecological or nutritional advice. The recommendations are personalised guides — they do not substitute professional consultation. If you have symptoms or specific health conditions, consult a healthcare professional.'
+            : lang === 'fr'
+            ? 'Meirins est un outil d\'information et de bien-être. Il ne remplace pas l\'avis médical, gynécologique ou nutritionnel. Les recommandations sont des guides personnalisés et ne remplacent pas une consultation professionnelle. En cas de symptômes ou de conditions de santé spécifiques, consulte un professionnel.'
+            : lang === 'it'
+            ? 'Meirins è uno strumento di informazione e benessere. Non sostituisce il parere medico, ginecologico o nutrizionale. Le raccomandazioni sono guide personalizzate e non sostituiscono il consulto professionale. In caso di sintomi o condizioni specifiche, consulta un professionista.'
+            : 'Meirins es una herramienta de información y bienestar. No sustituye el consejo médico, ginecológico ni nutricional. Las recomendaciones son guías personalizadas, no consultas profesionales. Si tienes síntomas o condiciones específicas, consulta a un profesional sanitario.'}
+        </Text>
+      </View>
+
       {/* ── CERRAR SESIÓN ── */}
       <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
         <Text style={styles.signOutText}>{p.profile.signOut}</Text>
@@ -1430,8 +1421,8 @@ export default function PerfilScreen({ pi, profile, signOut }) {
 
       {/* ── ELIMINAR CUENTA ── */}
       {(() => {
-        const [deleting, setDeleting] = React.useState(false);
-        const [step,     setStep]     = React.useState(0); // 0=oculto 1=confirmación 2=borrando
+        const step    = deleteStep;
+        const setStep = setDeleteStep;
 
         const deleteLabel = {
           btn:      { es: 'Eliminar mi cuenta y datos', en: 'Delete my account and data', fr: 'Supprimer mon compte et mes données', it: 'Elimina il mio account e i dati' },
@@ -1505,9 +1496,20 @@ const styles = StyleSheet.create({
   content: { padding: 14, paddingTop: 60, paddingBottom: 40 },
 
   header: { alignItems: 'center', marginBottom: 20 },
-  avatar: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#1A56DB', justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+  avatarWrap: { position: 'relative', marginBottom: 10 },
+  avatar:     { width: 70, height: 70, borderRadius: 35, backgroundColor: '#1A56DB', justifyContent: 'center', alignItems: 'center' },
+  avatarImg:  { width: 70, height: 70, borderRadius: 35, backgroundColor: '#1A56DB' },
   avatarText: { fontSize: 30, color: 'white', fontWeight: '700' },
+  avatarEdit: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: 'white', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 3, borderWidth: 1, borderColor: '#E2E8F0' },
+  avatarEditTxt: { fontSize: 12 },
   headerName: { fontSize: 22, fontWeight: '700', color: '#1E293B', marginBottom: 6 },
+
+  // Modal de edición de nombre
+  nameModalOverlay: { position: 'absolute', top: 0, left: -14, right: -14, bottom: -300, backgroundColor: 'rgba(15,31,74,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 100 },
+  nameModal:        { width: '90%', maxWidth: 360, backgroundColor: 'white', borderRadius: 18, padding: 20 },
+  nameModalTitle:   { fontSize: 16, fontWeight: '700', color: '#1E293B', marginBottom: 12 },
+  nameInput:        { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, padding: 12, fontSize: 16, color: '#1E293B', backgroundColor: '#F8FAFC' },
+  nameModalBtn:     { flex: 1, padding: 12, borderRadius: 12, alignItems: 'center' },
   headerMeta: { flexDirection: 'row', gap: 8, marginBottom: 6, flexWrap: 'wrap', justifyContent: 'center' },
   metaChip: { fontSize: 13, color: '#1A56DB', backgroundColor: '#EFF6FF', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, fontWeight: '500' },
   headerGoal: { fontSize: 13, color: '#475569', marginBottom: 4, textAlign: 'center' },
@@ -1575,6 +1577,18 @@ const styles = StyleSheet.create({
   iaExamples: { backgroundColor: 'white', borderRadius: 12, padding: 12 },
   iaQ: { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   iaQText: { fontSize: 13, color: '#475569' },
+
+  // Legal links
+  legalLink:    { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  legalEmoji:   { fontSize: 18, width: 26 },
+  legalLabel:   { flex: 1, fontSize: 14, color: '#334155', fontWeight: '500' },
+  legalArrow:   { fontSize: 16, color: '#94A3B8' },
+  legalVersion: { fontSize: 11, color: '#94A3B8', textAlign: 'center', marginTop: 12 },
+
+  // Medical disclaimer
+  medCard:      { backgroundColor: '#FEF3C7', borderRadius: 14, padding: 14, marginTop: 8, marginBottom: 8, borderWidth: 1, borderColor: '#FDE68A' },
+  medCardTitle: { fontSize: 13, fontWeight: '700', color: '#92400E', marginBottom: 6 },
+  medCardBody:  { fontSize: 12, color: '#78350F', lineHeight: 18 },
 
   signOutBtn:  { marginTop: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: 'white', alignItems: 'center' },
   signOutText: { fontSize: 14, color: '#64748B', fontWeight: '500' },

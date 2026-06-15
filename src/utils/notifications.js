@@ -40,40 +40,39 @@ Notifications.setNotificationHandler({
 // Permisos
 // ─────────────────────────────────────────────────────────────────────────────
 
+async function ensureAndroidChannels() {
+  if (Platform.OS !== 'android') return;
+  await Promise.all([
+    Notifications.setNotificationChannelAsync(CHANNEL_CYCLE, {
+      name: 'Ciclo menstrual',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#EC4899',
+    }),
+    Notifications.setNotificationChannelAsync(CHANNEL_WORKOUT, {
+      name: 'Entrenamientos',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      lightColor: '#1A56DB',
+    }),
+    Notifications.setNotificationChannelAsync(CHANNEL_HYDRATION, {
+      name: 'Hidratación',
+      importance: Notifications.AndroidImportance.LOW,
+      lightColor: '#06B6D4',
+    }),
+  ]);
+}
+
 export async function requestNotificationPermission() {
   if (Platform.OS === 'web') return false;
 
-  // Solo los dispositivos físicos pueden recibir push notifications
-  // pero las locales funcionan también en simulador
+  // Canales Android deben existir antes de programar notificaciones
+  await ensureAndroidChannels();
+
   const { status: existing } = await Notifications.getPermissionsAsync();
   if (existing === 'granted') return true;
 
   const { status } = await Notifications.requestPermissionsAsync();
-  if (status !== 'granted') return false;
-
-  // Crear canales de Android
-  if (Platform.OS === 'android') {
-    await Promise.all([
-      Notifications.setNotificationChannelAsync(CHANNEL_CYCLE, {
-        name: 'Ciclo menstrual',
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#EC4899',
-      }),
-      Notifications.setNotificationChannelAsync(CHANNEL_WORKOUT, {
-        name: 'Entrenamientos',
-        importance: Notifications.AndroidImportance.DEFAULT,
-        lightColor: '#1A56DB',
-      }),
-      Notifications.setNotificationChannelAsync(CHANNEL_HYDRATION, {
-        name: 'Hidratación',
-        importance: Notifications.AndroidImportance.LOW,
-        lightColor: '#06B6D4',
-      }),
-    ]);
-  }
-
-  return true;
+  return status === 'granted';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

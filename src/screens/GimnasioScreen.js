@@ -4,7 +4,9 @@ import {
   TextInput, StyleSheet, ActivityIndicator, Platform,
 } from 'react-native';
 import T, { getDayLabels } from '../i18n/translations';
-import { GymSetupCard } from '../components/TabSetupCard';
+import { GymSetupCard, SPORTS_LIST } from '../components/TabSetupCard';
+import ProgramsCard from '../components/ProgramsCard';
+import { getActiveProgramState, getProgramDays, programSessionToCard } from '../data/trainingPrograms';
 import { DAY_SHORT, DAY_LABELS, jsToIdx } from '../data/phases';
 import {
   getSessionType,
@@ -14,8 +16,12 @@ import {
   resolveSession,
 } from '../data/marinaProgram';
 import { buildWeekPlan, PHASE_CONFIG } from '../utils/programEngine';
+import SleepCard from '../components/SleepCard';
+import { useWorkouts } from '../hooks/useWorkouts';
+import { buildPersonalizedWeekPlan } from '../utils/workoutEngine';
 import { ARTICLES } from '../data/articles';
 import TipsCard from '../components/TipsCard';
+import SwipeableTabs from '../components/SwipeableTabs';
 
 const GYM_ARTICLE_IDS = ['cycle-training', 'pcos-hormones'];
 const gymArticles = ARTICLES.filter(a => GYM_ARTICLE_IDS.includes(a.id));
@@ -43,12 +49,80 @@ function fmtNum(n) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ─── Selector de deporte extra: lista de deportes + "Otro" + duración ────────
+function ExtraSportPicker({ lang, g, onPick }) {
+  const [other, setOther] = useState(false);
+  const [txt, setTxt]     = useState('');
+  const [sport, setSport] = useState(null);   // deporte elegido, pendiente de duración
+  const tr = (es, en, fr, it) => ({ es, en, fr, it }[lang] || es);
+  const DURATIONS = [15, 30, 45, 60, 90, 120];
+
+  // Paso 2: ¿cuánto tiempo?
+  if (sport) return (
+    <View>
+      <Text style={{ fontSize: 13, color: '#334155', fontWeight: '600', marginBottom: 8 }}>
+        🏅 {sport} — {tr('¿cuánto tiempo?', 'how long?', 'combien de temps ?', 'quanto tempo?')}
+      </Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {DURATIONS.map(m => (
+          <TouchableOpacity key={m} onPress={() => onPick(sport, m)}
+            style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 50, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE' }}>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: '#1E40AF' }}>{m} min</Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity onPress={() => onPick(sport, null)}
+          style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 50, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' }}>
+          <Text style={{ fontSize: 12, fontWeight: '500', color: '#64748B' }}>
+            {tr('Sin tiempo', 'Skip time', 'Sans durée', 'Senza tempo')}
+          </Text>
+        </TouchableOpacity>
+      </View>
+      <TouchableOpacity onPress={() => setSport(null)} style={{ marginTop: 8 }}>
+        <Text style={{ fontSize: 12, color: '#94A3B8', textAlign: 'center' }}>
+          ← {tr('Cambiar deporte', 'Change sport', 'Changer de sport', 'Cambia sport')}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Paso 1: ¿qué deporte?
+  return (
+    <View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {SPORTS_LIST.map(o => (
+          <TouchableOpacity key={o.id}
+            onPress={() => o.id === 'other' ? setOther(!other) : setSport(o.label[lang] || o.label.es)}
+            style={{
+              paddingHorizontal: 12, paddingVertical: 8, borderRadius: 50,
+              backgroundColor: (o.id === 'other' && other) ? BLUE.primary : '#F1F5F9',
+              borderWidth: 1, borderColor: (o.id === 'other' && other) ? BLUE.primary : '#E2E8F0',
+            }}>
+            <Text style={{ fontSize: 12, fontWeight: '500', color: (o.id === 'other' && other) ? 'white' : '#334155' }}>
+              {o.emoji} {o.label[lang] || o.label.es}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {other && (
+        <View style={[styles.extraInput, { marginTop: 10 }]}>
+          <TextInput style={styles.input} value={txt} onChangeText={setTxt}
+            placeholder={g.extraPlaceholder} autoFocus />
+          <TouchableOpacity style={styles.addBtn} onPress={() => txt.trim() && setSport(txt.trim())}>
+            <Text style={styles.addBtnText}>{g.add}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function GimnasioScreen({
-  pi, trainDays, setTrainDays, program, lang = 'es',
+  pi, trainDays, setTrainDays, program, lang = 'es', goal,
   healthData, profileExtended, saveProfileExtended,
+  toggleFavoriteWorkout, skipWorkout, logWorkoutDone,
+  sleepLog = [], logSleep,
 }) {
   const [sub, setSub] = useState('hoy');
-  const [extraInput, setExtraInput] = useState('');
   const [addingSport, setAddingSport] = useState(false);
   const [workoutLog, setWorkoutLog] = useState({});
   const [completedExercises, setCompletedExercises] = useState({});
@@ -70,13 +144,70 @@ export default function GimnasioScreen({
   // ── Plan personalizado (fase + trainDays + fitness + condiciones) ────────────
   const fitnessLevel = profileExtended?.fitnessLevel || 'regular';
   const conditions   = profileExtended?.conditions   || [];
-  const personalPlan = buildWeekPlan(pi?.phase, trainDays, fitnessLevel, conditions);
-  const todaySession = personalPlan[todayDow] ?? null;   // null = día de descanso
+  const gymAccess    = profileExtended?.gymAccess    || 'home';
+  const lifeStage    = profileExtended?.lifeStage    || null;
+  const primaryGoals = profileExtended?.primaryGoals || [];
+
+  // Carga workouts de Supabase
+  const { workouts: dbWorkouts } = useWorkouts();
+
+  // Skipped workouts de hoy
+  const todayStrW   = todayKey;
+  const skippedWBlk = profileExtended?.skippedTodayWorkout || {};
+  const skippedWorkoutIds = skippedWBlk.date === todayStrW ? (skippedWBlk.ids || []) : [];
+
+  // Plan desde Supabase si está cargado, sino fallback al motor estático
+  const planFromDb = dbWorkouts?.length
+    ? buildPersonalizedWeekPlan(
+        dbWorkouts,
+        {
+          fitnessLevel, conditions, gymAccess, lifeStage, primaryGoals,
+          sportProfile: profileExtended?.sportProfile || {},
+          goal: goal ?? profileExtended?.goal,
+          favoriteWorkouts: profileExtended?.favoriteWorkouts || [],
+          skippedWorkoutIds,
+        },
+        pi?.phase,
+        trainDays,
+        lang,
+      )
+    : null;
+
+  const personalPlan = planFromDb && Object.keys(planFromDb).length > 0
+    ? planFromDb
+    : buildWeekPlan(pi?.phase, trainDays, fitnessLevel, conditions);
+
+  // ── Programa activo: sus sesiones SON el plan en los primeros N días de
+  //    entreno (N = sesiones/semana del programa); el motor rellena el resto ──
+  const progState  = getActiveProgramState(profileExtended);
+  const progDays   = progState ? getProgramDays(progState.program, trainDays) : [];
+  const todayIsProgramDay = !!progState && (progDays.includes(todayDow) || (trainDays?.length ?? 0) === 0);
+
+  const todaySession = todayIsProgramDay
+    ? programSessionToCard(progState, lang)
+    : (personalPlan[todayDow] ?? null);   // null = día de descanso
   const todayLog     = workoutLog[todayKey];
   const phaseConfig  = PHASE_CONFIG[pi?.phase] || PHASE_CONFIG.follicular;
 
-  const saveLog = (update) =>
+  // Marcar "hecha" la sesión de hoy avanza también el programa
+  const advanceProgram = async () => {
+    if (!progState) return;
+    const { program, active, total, done } = progState;
+    if (done + 1 >= total) {
+      const completed = profileExtended?.completedPrograms || [];
+      await saveProfileExtended?.({
+        activeProgram: null,
+        completedPrograms: [...completed.filter(id => id !== program.id), program.id],
+      });
+    } else {
+      await saveProfileExtended?.({ activeProgram: { ...active, done: done + 1 } });
+    }
+  };
+
+  const saveLog = (update) => {
     setWorkoutLog(prev => ({ ...prev, [todayKey]: update }));
+    if (update?.status === 'done' && todayIsProgramDay) advanceProgram();
+  };
 
   const toggleExercise = (idx) =>
     setCompletedExercises(prev => ({ ...prev, [idx]: !prev[idx] }));
@@ -84,11 +215,16 @@ export default function GimnasioScreen({
   const completedCount  = Object.values(completedExercises).filter(Boolean).length;
   const totalExercises  = sessionRenfo.exercises.length;
 
+  let progOffset = 0;   // numera las sesiones del programa a lo largo de la semana
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const date    = new Date(); date.setDate(date.getDate() + i);
     const dow     = date.getDay();
     const dateKey = date.toISOString().split('T')[0];
-    const session = personalPlan[dow] ?? null;
+    let session = personalPlan[dow] ?? null;
+    if (progState && progDays.includes(dow)) {
+      const card = programSessionToCard(progState, lang, progState.done + progOffset);
+      if (card) { session = card; progOffset += 1; }
+    }
     const sType   = session ? 'workout' : 'rest';
     return {
       date, dow, sessionType: sType, session,
@@ -108,6 +244,7 @@ export default function GimnasioScreen({
   const wEmoji = (type) => hl?.workoutEmoji?.[type] ?? '💪';
 
   return (
+    <SwipeableTabs tabs={['hoy', 'semana', 'salud']} current={sub} onChange={setSub}>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
       <GymSetupCard lang={lang} trainDays={trainDays} setTrainDays={setTrainDays}
@@ -129,6 +266,11 @@ export default function GimnasioScreen({
 
       {/* ════════════════════════ HOY ════════════════════════ */}
       {sub === 'hoy' && <>
+        {/* Programas guiados (de 0 a 5K, natación, fuerza…). Si hoy toca
+            sesión del programa, la tarjeta es compacta porque la sesión
+            se muestra como "Sesión de hoy" más abajo */}
+        <ProgramsCard lang={lang} profileExtended={profileExtended}
+          saveProfileExtended={saveProfileExtended} compact={todayIsProgramDay} />
 
         {/* Mini health banner (last workout from HealthKit, if today) */}
         {connected && hd.lastWorkout && hd.lastWorkout.date === todayKey && (
@@ -152,7 +294,15 @@ export default function GimnasioScreen({
           {/* Bannière de séance — compatible con datos de fase y datos legacy */}
           {(() => {
             const bgColor   = todaySession.phaseColor || todaySession.color   || BLUE.light;
-            const txtColor  = todaySession.textColor  || 'white';
+            // Si el fondo es claro, texto oscuro; si es oscuro, blanco
+            const isLightBg = (() => {
+              const m = /^#?([0-9a-f]{6})/i.exec(String(bgColor));
+              if (!m) return false;
+              const n = parseInt(m[1], 16);
+              const r = (n >> 16) & 255, gC = (n >> 8) & 255, b = n & 255;
+              return (0.299 * r + 0.587 * gC + 0.114 * b) > 160;
+            })();
+            const txtColor  = todaySession.textColor  || (isLightBg ? '#1E3A8A' : 'white');
             const durLabel  = todaySession.dur         || todaySession.duration || '';
             return (
               <View style={[styles.card, { backgroundColor: bgColor }]}>
@@ -220,15 +370,36 @@ export default function GimnasioScreen({
             </View>
           )}
 
+          {/* Acciones rápidas: favorito + swap */}
+          {todaySession?.id && !todaySession.isProgram && (toggleFavoriteWorkout || skipWorkout) && (
+            <View style={styles.quickActions}>
+              {toggleFavoriteWorkout && (() => {
+                const isFav = profileExtended?.favoriteWorkouts?.includes(todaySession.id);
+                return (
+                  <TouchableOpacity onPress={() => toggleFavoriteWorkout(todaySession.id)} style={styles.quickBtn}>
+                    <Text style={styles.quickBtnTxt}>{isFav ? '❤️' : '🤍'}</Text>
+                    <Text style={styles.quickBtnLbl}>{lang === 'en' ? 'Favourite' : lang === 'fr' ? 'Favori' : 'Favorito'}</Text>
+                  </TouchableOpacity>
+                );
+              })()}
+              {skipWorkout && (
+                <TouchableOpacity onPress={() => skipWorkout(todaySession.id)} style={styles.quickBtn}>
+                  <Text style={styles.quickBtnTxt}>🔄</Text>
+                  <Text style={styles.quickBtnLbl}>{lang === 'en' ? 'Swap' : 'Cambiar'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
           {/* Botones log */}
           {!todayLog ? (
             <View style={styles.logBtns}>
               <TouchableOpacity style={styles.doneBtn}
-                onPress={() => saveLog({ status: 'done', extraSport: '' })}>
+                onPress={() => { saveLog({ status: 'done', extraSport: '' }); logWorkoutDone?.('done'); }}>
                 <Text style={styles.doneBtnText}>{g.sessionDone}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.skipBtn}
-                onPress={() => saveLog({ status: 'skipped', extraSport: '' })}>
+                onPress={() => { saveLog({ status: 'skipped', extraSport: '' }); logWorkoutDone?.('skipped'); }}>
                 <Text style={styles.skipBtnText}>{g.sessionSkipped}</Text>
               </TouchableOpacity>
             </View>
@@ -244,23 +415,17 @@ export default function GimnasioScreen({
             <Text style={styles.sectionTitle}>{g.addExtra}</Text>
             {todayLog?.extraSport ? (
               <View style={styles.extraRow}>
-                <Text style={styles.extraText}>🏅 {todayLog.extraSport}</Text>
+                <Text style={styles.extraText}>🏅 {todayLog.extraSport}{todayLog.extraMinutes ? ` · ${todayLog.extraMinutes} min` : ''}</Text>
                 <TouchableOpacity onPress={() => saveLog({ ...todayLog, extraSport: '' })}>
                   <Text style={styles.extraRemove}>×</Text>
                 </TouchableOpacity>
               </View>
             ) : addingSport ? (
-              <View style={styles.extraInput}>
-                <TextInput style={styles.input} value={extraInput}
-                  onChangeText={setExtraInput} placeholder={g.extraPlaceholder} />
-                <TouchableOpacity style={styles.addBtn}
-                  onPress={() => {
-                    saveLog({ ...(todayLog || { status: 'done' }), extraSport: extraInput });
-                    setAddingSport(false); setExtraInput('');
-                  }}>
-                  <Text style={styles.addBtnText}>{g.add}</Text>
-                </TouchableOpacity>
-              </View>
+              <ExtraSportPicker lang={lang} g={g}
+                onPick={(label, minutes) => {
+                  saveLog({ ...(todayLog || { status: 'done' }), extraSport: label, extraMinutes: minutes || null });
+                  setAddingSport(false);
+                }} />
             ) : (
               <TouchableOpacity style={styles.dashedBtn} onPress={() => setAddingSport(true)}>
                 <Text style={styles.dashedBtnText}>{g.addActivity}</Text>
@@ -279,23 +444,17 @@ export default function GimnasioScreen({
             <Text style={styles.sectionTitle}>{g.restRecord}</Text>
             {todayLog?.extraSport ? (
               <View style={[styles.extraRow, { backgroundColor: BLUE.light }]}>
-                <Text style={[styles.extraText, { color: '#1E40AF' }]}>🏅 {todayLog.extraSport}</Text>
+                <Text style={[styles.extraText, { color: '#1E40AF' }]}>🏅 {todayLog.extraSport}{todayLog.extraMinutes ? ` · ${todayLog.extraMinutes} min` : ''}</Text>
                 <TouchableOpacity onPress={() => setWorkoutLog(prev => { const u = { ...prev }; delete u[todayKey]; return u; })}>
                   <Text style={styles.extraRemove}>×</Text>
                 </TouchableOpacity>
               </View>
             ) : addingSport ? (
-              <View style={styles.extraInput}>
-                <TextInput style={styles.input} value={extraInput}
-                  onChangeText={setExtraInput} placeholder={g.extraPlaceholder} />
-                <TouchableOpacity style={styles.addBtn}
-                  onPress={() => {
-                    saveLog({ status: 'extra', extraSport: extraInput });
-                    setAddingSport(false); setExtraInput('');
-                  }}>
-                  <Text style={styles.addBtnText}>{g.add}</Text>
-                </TouchableOpacity>
-              </View>
+              <ExtraSportPicker lang={lang} g={g}
+                onPick={(label, minutes) => {
+                  saveLog({ status: 'extra', extraSport: label, extraMinutes: minutes || null });
+                  setAddingSport(false);
+                }} />
             ) : (
               <TouchableOpacity style={styles.dashedBtn} onPress={() => setAddingSport(true)}>
                 <Text style={styles.dashedBtnText}>{g.addSpontaneous}</Text>
@@ -337,7 +496,7 @@ export default function GimnasioScreen({
                       {s ? s.name : g.rest}
                     </Text>
                     {s && <Text style={styles.weekDur}>{s.duration}</Text>}
-                    {day.log?.extraSport && <Text style={styles.weekExtra}>+ {day.log.extraSport}</Text>}
+                    {day.log?.extraSport && <Text style={styles.weekExtra}>+ {day.log.extraSport}{day.log.extraMinutes ? ` · ${day.log.extraMinutes} min` : ''}</Text>}
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 4 }}>
                     {st === 'done'    && <Text style={{ color: GREEN.text,  fontWeight: '700', fontSize: 16 }}>✓</Text>}
@@ -395,19 +554,23 @@ export default function GimnasioScreen({
 
       {/* ════════════════════════ SALUD ════════════════════════ */}
       {sub === 'salud' && (
-        <HealthTab
-          hl={hl}
-          hd={hd}
-          lang={lang}
-          wLabel={wLabel}
-          wEmoji={wEmoji}
-        />
+        <>
+          <SleepCard sleepLog={sleepLog} logSleep={logSleep} lang={lang} />
+          <HealthTab
+            hl={hl}
+            hd={hd}
+            lang={lang}
+            wLabel={wLabel}
+            wEmoji={wEmoji}
+          />
+        </>
       )}
 
       {/* Consejos */}
       <TipsCard articles={gymArticles} lang={lang} />
 
     </ScrollView>
+    </SwipeableTabs>
   );
 }
 
@@ -690,6 +853,11 @@ const styles = StyleSheet.create({
   phaseDetail: { fontSize: 12, color: '#64748B', lineHeight: 18 },
 
   // log buttons
+  quickActions: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  quickBtn:     { flex: 1, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: 'white', alignItems: 'center' },
+  quickBtnTxt:  { fontSize: 22, marginBottom: 2 },
+  quickBtnLbl:  { fontSize: 11, color: '#64748B', fontWeight: '500' },
+
   logBtns: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   doneBtn: { flex: 1, padding: 14, borderRadius: 14, backgroundColor: '#16A34A', alignItems: 'center' },
   doneBtnText: { color: 'white', fontWeight: '700', fontSize: 14 },

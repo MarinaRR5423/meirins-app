@@ -153,7 +153,7 @@ ARRAY['dairy'],
 ),
 
 ('arroz_atun_aceite_oliva',201,'lunch','🍚',
-'{"es":"Arroz con atún y aceite de oliva","en":"Rice with tuna and olive oil","fr":"Riz thon-huile d\'olive","it":"Riso con tonno e olio d\'oliva"}',
+'{"es":"Arroz con atún y aceite de oliva","en":"Rice with tuna and olive oil","fr":"Riz thon-huile d''olive","it":"Riso con tonno e olio d''oliva"}',
 '{"es":"Clásico post-entreno sin cocinar: arroz + atún en 2 minutos","en":"Classic no-cook post-workout: rice + tuna in 2 minutes"}',
 2,12,440,30,56,8,3,
 ARRAY['pescatarian','gluten_free','lactose_free','high_protein','standard'],
@@ -169,7 +169,7 @@ ARRAY['fish'],
 -- ── DESAYUNOS ADICIONALES ─────────────────────────────────────────────────────
 
 ('tostadas_mantequilla_platano',202,'breakfast','🍞',
-'{"es":"Tostadas con mantequilla de almendras y plátano","en":"Toast with almond butter and banana","fr":"Toasts beurre d\'amandes et banane","it":"Toast con burro di mandorle e banana"}',
+'{"es":"Tostadas con mantequilla de almendras y plátano","en":"Toast with almond butter and banana","fr":"Toasts beurre d''amandes et banane","it":"Toast con burro di mandorle e banana"}',
 '{"es":"Desayuno sencillo y energético: carbos, grasas y dulzor natural","en":"Simple energising breakfast: carbs, fats and natural sweetness"}',
 3,3,380,10,50,16,6,
 ARRAY['vegetarian','vegan'],
@@ -329,7 +329,7 @@ ARRAY['gluten','soy','sesame'],
 -- ── RECETAS ESPECIALES ────────────────────────────────────────────────────────
 
 ('caldo_huesos_casero',213,'dinner','🍵',
-'{"es":"Caldo de huesos casero","en":"Homemade bone broth","fr":"Bouillon d\'os maison","it":"Brodo di ossa fatto in casa"}',
+'{"es":"Caldo de huesos casero","en":"Homemade bone broth","fr":"Bouillon d''os maison","it":"Brodo di ossa fatto in casa"}',
 '{"es":"Superalimento para la fase menstrual: colágeno, minerales y reconfortante","en":"Superfood for menstrual phase: collagen, minerals and deeply comforting"}',
 10,120,80,8,4,3,0,
 ARRAY['gluten_free','lactose_free','paleo','keto','low_carb','low_fodmap'],

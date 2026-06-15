@@ -438,4 +438,5 @@ ARRAY['dairy'],
 'easy','under_20','medium',
 '{"es":["400ml leche entera o nata para montar","2 hojas gelatina (o 1 cdta agar agar para versión vegana)","2 cdas azúcar o sirope de arce","1 cdta extracto de vainilla","Para el coulis: 100g frutos rojos, 1 cda miel"],"en":["400ml whole milk or single cream","2 gelatine sheets (or 1 tsp agar agar for vegan)","2 tbsp sugar or maple syrup","1 tsp vanilla extract","For coulis: 100g berries, 1 tbsp honey"]}',
 '{"es":["Remoja la gelatina en agua fría 5 min","Calienta la leche con azúcar y vainilla sin hervir","Escurre la gelatina e incorpórala removiendo hasta disolver","Vierte en vasitos y refrigera 4 horas mínimo","Prepara el coulis calentando los frutos rojos con miel 5 min y triturando"],"en":["Soak gelatine in cold water 5 min","Heat milk with sugar and vanilla without boiling","Drain gelatine and stir in until dissolved","Pour into glasses and refrigerate minimum 4 hours","Make coulis by heating berries with honey 5 min and blending"]}'
-);
+)
+ON CONFLICT (id) DO NOTHING;

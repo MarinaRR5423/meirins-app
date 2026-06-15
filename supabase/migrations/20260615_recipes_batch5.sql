@@ -328,7 +328,7 @@ ARRAY['eggs','nuts'],
 
 ('arroz_frito_verduras_huevo',183,'lunch','🍳',
 '{"es":"Arroz frito con verduras y huevo","en":"Fried rice with vegetables and egg","fr":"Riz sauté aux légumes et oeuf","it":"Riso fritto con verdure e uovo"}',
-'{"es":"Aprovecha el arroz del día anterior: receta anticidesperdicio y sabrosa","en":"Use yesterday's rice: anti-waste and delicious recipe"}',
+'{"es":"Aprovecha el arroz del día anterior: receta anticidesperdicio y sabrosa","en":"Use yesterday''s rice: anti-waste and delicious recipe"}',
 5,10,420,14,56,14,5,
 ARRAY['vegetarian','gluten_free','lactose_free'],
 ARRAY['follicular','ovulation'],
@@ -438,4 +438,5 @@ ARRAY['fish','eggs'],
 'easy','under_20','medium',
 '{"es":["250g atún fresco picado","1 huevo","2 cdas pan rallado sin gluten","1 cdta soja o tamari","Jengibre rallado, ajo en polvo","Sal, pimienta","Para servir: lechuga, tomate, aguacate, pan sin gluten"],"en":["250g fresh tuna minced","1 egg","2 tbsp gluten-free breadcrumbs","1 tsp soy or tamari","Grated ginger, garlic powder","Salt, pepper","To serve: lettuce, tomato, avocado, gluten-free bun"]}',
 '{"es":["Mezcla atún con huevo, pan rallado, tamari, jengibre y especias","Forma 2 hamburguesas","Cocina en plancha caliente 3-4 min por lado","Sirve en pan (o sin pan) con lechuga, tomate y aguacate"],"en":["Mix tuna with egg, breadcrumbs, tamari, ginger and spices","Shape into 2 patties","Cook on hot griddle 3-4 min per side","Serve in bun (or bunless) with lettuce, tomato and avocado"]}'
-);
+)
+ON CONFLICT (id) DO NOTHING;

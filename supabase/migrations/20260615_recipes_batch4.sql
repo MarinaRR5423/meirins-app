@@ -434,4 +434,5 @@ ARRAY['sesame'],
 'easy','20_40','low',
 '{"es":["80g quinoa o arroz integral","240g garbanzos cocidos (lata)","1 zanahoria rallada","1/4 col lombarda en juliana","1/2 aguacate","Salsa tahini: 2 cdas tahini, zumo de limón, agua, ajo, sal"],"en":["80g quinoa or brown rice","240g cooked chickpeas (can)","1 grated carrot","1/4 red cabbage in julienne","1/2 avocado","Tahini dressing: 2 tbsp tahini, lemon juice, water, garlic, salt"]}',
 '{"es":["Cuece el grano según instrucciones","Asa los garbanzos con pimentón y aceite 20 min a 200°C","Prepara la salsa tahini mezclando todos los ingredientes","Monta el bol con todos los elementos y la salsa encima"],"en":["Cook grain according to instructions","Roast chickpeas with paprika and oil 20 min at 200°C","Make tahini dressing by mixing all ingredients","Assemble bowl with all elements and dressing on top"]}'
-);
+)
+ON CONFLICT (id) DO NOTHING;

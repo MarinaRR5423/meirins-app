@@ -16,6 +16,17 @@ import NutriScreen from './src/screens/NutriScreen';
 import GimnasioScreen from './src/screens/GimnasioScreen';
 import PerfilScreen from './src/screens/IAScreen';
 import { useHealthData } from './src/hooks/useHealthData';
+import { PostHogProvider, usePostHog } from 'posthog-react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import ErrorBoundary from './src/components/ErrorBoundary';
+import { initAnalytics, wrapWithSentry, trackEvent, identifyUser, setPostHogClient, Events } from './src/lib/analytics';
+
+// Conector entre el contexto de PostHog y nuestro módulo analytics.js
+function PostHogBridge() {
+  const ph = usePostHog();
+  useEffect(() => { setPostHogClient(ph || null); }, [ph]);
+  return null;
+}
 
 const Tab = createBottomTabNavigator();
 
@@ -77,11 +88,21 @@ function OfflineBanner({ lang }) {
   );
 }
 
-export default function App() {
+function App() {
   const profile    = useProfile();
   const healthData = useHealthData();
   const [setupLang, setSetupLang] = React.useState(getDeviceLang);
   const [isOffline, setIsOffline] = useState(false);
+
+  // Analytics init (no-op si no está configurado)
+  useEffect(() => { initAnalytics(); }, []);
+
+  // Identifica al usuario tras login
+  useEffect(() => {
+    if (profile?.user?.id) {
+      identifyUser(profile.user.id, { email: profile.user.email });
+    }
+  }, [profile?.user?.id]);
 
   // Deep link listener (email confirmation)
   useEffect(() => {
@@ -111,24 +132,31 @@ export default function App() {
   const { periodEnd, sleepLog, programContent } = profile;
   const pi = lastPeriod ? getPhaseInfo(lastPeriod, cycleLength, periodEnd) : null;
 
-  // Pick the right language column from program_content table, fall back to ES
+  // Pick the right language column from program_content table.
+  // For non-ES langs, fall back to null (→ static multilingual menus) instead
+  // of data_es (flat Spanish strings), which would bypass EN/FR/IT translations.
   const programData = programContent
-    ? (programContent[`data_${lang}`] ?? programContent.data_es ?? null)
+    ? (programContent[`data_${lang}`] ?? (lang === 'es' ? programContent.data_es : null))
     : null;
 
   if (authState === 'loading' || (authState === 'authenticated' && !profileLoaded)) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F1F4A' }}>
         <Text style={{ fontSize: 48, marginBottom: 16 }}>🌙</Text>
+        <Text style={{ color: 'white', fontSize: 18, fontWeight: '700', letterSpacing: 1.5, marginBottom: 18 }}>MEIRINS</Text>
         <ActivityIndicator color="white" size="large" />
       </View>
     );
   }
 
-  if (authState === 'unauthenticated') return <AuthScreen />;
-  if (!setupDone) return <SetupScreen onDone={profile.handleSetupDone} lang={setupLang} onLangChange={setSetupLang} />;
+  if (authState === 'unauthenticated') return <ErrorBoundary><AuthScreen lang={setupLang} /></ErrorBoundary>;
+  if (!setupDone) return <ErrorBoundary><SetupScreen onDone={profile.handleSetupDone} lang={setupLang} onLangChange={setSetupLang} /></ErrorBoundary>;
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+    <PostHogProvider apiKey={process.env.EXPO_PUBLIC_POSTHOG_KEY} options={{ host: process.env.EXPO_PUBLIC_POSTHOG_HOST }}>
+    <PostHogBridge />
+    <ErrorBoundary>
     <NavigationContainer>
       {isOffline && <OfflineBanner lang={lang} />}
       <Tab.Navigator
@@ -140,7 +168,7 @@ export default function App() {
           tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
         }}>
         <Tab.Screen name="Inicio" options={{ tabBarLabel: tabs.home, tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏠</Text> }}>
-          {() => <HomeScreen lang={lang} pi={pi} profile={{
+          {() => <HomeScreen lang={lang} pi={pi} healthData={healthData} profile={{
             age: profile.age, weight: profile.weight, height: profile.height,
             activityLevel: profile.activityLevel, goal: profile.goal,
             trainDays: profile.trainDays,
@@ -148,7 +176,7 @@ export default function App() {
           }} />}
         </Tab.Screen>
         <Tab.Screen name="Ciclo" options={{ tabBarLabel: tabs.cycle, tabBarIcon: () => <Text style={{ fontSize: 20 }}>🌙</Text> }}>
-          {() => <CicloScreen lang={lang} pi={pi} lastPeriod={lastPeriod} setLastPeriod={profile.setLastPeriod} setCycleLength={profile.setCycleLength} periodEnd={periodEnd} setPeriodEnd={profile.setPeriodEnd} sleepLog={sleepLog} logSleep={profile.logSleep} profileExtended={profile.profileExtended} saveProfileExtended={profile.saveProfileExtended} />}
+          {() => <CicloScreen lang={lang} pi={pi} lastPeriod={lastPeriod} setLastPeriod={profile.setLastPeriod} setCycleLength={profile.setCycleLength} periodEnd={periodEnd} setPeriodEnd={profile.setPeriodEnd} sleepLog={sleepLog} logSleep={profile.logSleep} profileExtended={profile.profileExtended} saveProfileExtended={profile.saveProfileExtended} logCycleDay={profile.logCycleDay} />}
         </Tab.Screen>
         <Tab.Screen name="Nutrición" options={{ tabBarLabel: tabs.nutri, tabBarIcon: () => <Text style={{ fontSize: 20 }}>🥗</Text> }}>
           {() => <NutriScreen lang={lang} pi={pi} program={programData}
@@ -156,11 +184,18 @@ export default function App() {
             profileExtended={profile.profileExtended}
             age={profile.age} weight={profile.weight} height={profile.height}
             trainDays={profile.trainDays}
-            saveAll={profile.saveAll} saveProfileExtended={profile.saveProfileExtended} />}
+            saveAll={profile.saveAll} saveProfileExtended={profile.saveProfileExtended}
+            toggleFavoriteRecipe={profile.toggleFavoriteRecipe}
+            skipRecipe={profile.skipRecipe}
+            logRecipeDone={profile.logRecipeDone} />}
         </Tab.Screen>
         <Tab.Screen name="Gimnasio" options={{ tabBarLabel: tabs.gym, tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏋️</Text> }}>
-          {() => <GimnasioScreen lang={lang} pi={pi} trainDays={profile.trainDays} setTrainDays={profile.setTrainDays} program={programData} healthData={healthData}
-            profileExtended={profile.profileExtended} saveProfileExtended={profile.saveProfileExtended} />}
+          {() => <GimnasioScreen lang={lang} pi={pi} trainDays={profile.trainDays} setTrainDays={profile.setTrainDays} program={programData} healthData={healthData} goal={profile.goal}
+            profileExtended={profile.profileExtended} saveProfileExtended={profile.saveProfileExtended}
+            toggleFavoriteWorkout={profile.toggleFavoriteWorkout}
+            skipWorkout={profile.skipWorkout}
+            logWorkoutDone={profile.logWorkoutDone}
+            sleepLog={sleepLog} logSleep={profile.logSleep} />}
         </Tab.Screen>
         <Tab.Screen name="Perfil" options={{ tabBarLabel: tabs.profile, tabBarIcon: () => <Text style={{ fontSize: 20 }}>👤</Text> }}>
           {() => <PerfilScreen pi={pi} profile={{
@@ -179,5 +214,9 @@ export default function App() {
         </Tab.Screen>
       </Tab.Navigator>
     </NavigationContainer>
+    </ErrorBoundary>
+    </PostHogProvider>
+    </GestureHandlerRootView>
   );
 }
+export default wrapWithSentry(App);

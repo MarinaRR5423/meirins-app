@@ -34,6 +34,11 @@ const T = {
       goToLogin: 'Ir al login →',
       enter: 'Entrar →',
       createBtn: 'Crear cuenta →',
+      forgotPassword: '¿Olvidaste tu contraseña?',
+      resetSent: 'Email enviado',
+      resetEmailSent: 'Hemos enviado un enlace para restablecer tu contraseña a',
+      backToLogin: 'Volver al login →',
+      enterEmailFirst: 'Introduce tu email para recuperar la contraseña',
     },
 
     home: {
@@ -496,6 +501,11 @@ const T = {
       goToLogin: 'Go to login →',
       enter: 'Sign in →',
       createBtn: 'Create account →',
+      forgotPassword: 'Forgot your password?',
+      resetSent: 'Email sent',
+      resetEmailSent: 'We sent a password reset link to',
+      backToLogin: 'Back to login →',
+      enterEmailFirst: 'Enter your email to reset your password',
     },
 
     home: {
@@ -1029,6 +1039,11 @@ const T = {
       goToLogin: 'Aller à la connexion →',
       enter: 'Se connecter →',
       createBtn: 'Créer un compte →',
+      forgotPassword: 'Mot de passe oublié ?',
+      resetSent: 'Email envoyé',
+      resetEmailSent: 'Nous avons envoyé un lien de réinitialisation à',
+      backToLogin: 'Retour à la connexion →',
+      enterEmailFirst: 'Saisis ton email pour réinitialiser ton mot de passe',
     },
 
     home: {
@@ -1562,6 +1577,11 @@ const T = {
       goToLogin: 'Vai al login →',
       enter: 'Accedi →',
       createBtn: 'Crea account →',
+      forgotPassword: 'Hai dimenticato la password?',
+      resetSent: 'Email inviata',
+      resetEmailSent: 'Abbiamo inviato un link per reimpostare la password a',
+      backToLogin: 'Torna al login →',
+      enterEmailFirst: 'Inserisci la tua email per recuperare la password',
     },
 
     home: {

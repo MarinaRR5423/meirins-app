@@ -16,10 +16,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 let AppleHealthKit = null;
 let HealthConnect  = null;
 
-// TODO (tarea #1): descomentar cuando react-native-health esté instalado
-// if (Platform.OS === 'ios') {
-//   try { AppleHealthKit = require('react-native-health').default; } catch (_) {}
-// }
+if (Platform.OS === 'ios') {
+  try { const m = require('react-native-health'); AppleHealthKit = m.default ?? m; } catch (_) {}
+}
 
 // TODO (tarea #2): descomentar cuando Expo SDK actualice a Kotlin 2.x
 // if (Platform.OS === 'android') {
@@ -234,16 +233,23 @@ export function useHealthData() {
         { startDate: twoDaysAgo.toISOString(), endDate: now.toISOString() },
         (err, results) => {
           if (err || !results?.length) { resolve(); return; }
+
+          // Filtrar solo la última noche: samples que terminaron después de
+          // ayer mediodía (12:00) — evita acumular noches anteriores
+          const yesterdayNoon = new Date(Date.now() - 86_400_000);
+          yesterdayNoon.setHours(12, 0, 0, 0);
+          const lastNight = results.filter(r => new Date(r.endDate) > yesterdayNoon);
+
           const ms = (arr) =>
             arr.reduce((s, r) => s + (new Date(r.endDate) - new Date(r.startDate)), 0);
-          const inBed   = results.filter(r => r.value === 'INBED');
-          const asleep  = results.filter(r => ['ASLEEP','CORE','DEEP','REM'].includes(r.value));
-          const deep    = results.filter(r => r.value === 'DEEP');
-          const rem     = results.filter(r => r.value === 'REM');
+          const inBed   = lastNight.filter(r => r.value === 'INBED');
+          const asleep  = lastNight.filter(r => ['ASLEEP','CORE','DEEP','REM'].includes(r.value));
+          const deep    = lastNight.filter(r => r.value === 'DEEP');
+          const rem     = lastNight.filter(r => r.value === 'REM');
           const totalH  = Math.round(ms(asleep) / 360_000) / 10;
           if (totalH > 0) {
             setLastSleep({
-              date:      results[0]?.startDate?.split('T')[0] ?? '',
+              date:      lastNight[0]?.startDate?.split('T')[0] ?? '',
               duration:  totalH,
               inBed:     Math.round(ms(inBed)  / 360_000) / 10,
               deepSleep: Math.round(ms(deep)   / 360_000) / 10,

@@ -213,7 +213,7 @@ export default function GimnasioScreen({
     setCompletedExercises(prev => ({ ...prev, [idx]: !prev[idx] }));
 
   const completedCount  = Object.values(completedExercises).filter(Boolean).length;
-  const totalExercises  = sessionRenfo.exercises.length;
+  const totalExercises  = sessionRenfo?.exercises?.length || 0;
 
   let progOffset = 0;   // numera las sesiones del programa a lo largo de la semana
   const weekDays = Array.from({ length: 7 }, (_, i) => {
@@ -555,7 +555,7 @@ export default function GimnasioScreen({
       {/* ════════════════════════ SALUD ════════════════════════ */}
       {sub === 'salud' && (
         <>
-          <SleepCard sleepLog={sleepLog} logSleep={logSleep} lang={lang} />
+          <SleepCard sleepLog={sleepLog} logSleep={logSleep} lang={lang} healthSleep={hd?.lastSleep} />
           <HealthTab
             hl={hl}
             hd={hd}
